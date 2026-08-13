@@ -31,6 +31,7 @@ public import PhyslibAlpha.QuantumMechanics.QuantumHarmonicOscillator
 public import PhyslibAlpha.QuantumMechanics.StinespringDilation
 public import PhyslibAlpha.Mathematics.PartialDerivativeTest
 public import PhyslibAlpha.ClassicalMechanics.CoupledSpringPotential
+public import PhyslibAlpha.ClassicalMechanics.Pendulum
 public import PhyslibAlpha.Particles.BeyondTheStandardModel.TwoHDM.ChargeBalance
 public import PhyslibAlpha.Particles.BeyondTheStandardModel.TwoHDM.EffectivePotential
 public import PhyslibAlpha.Particles.BeyondTheStandardModel.TwoHDM.GaugeSlice
