@@ -60,36 +60,37 @@ structure Particle (frame : ReferenceFrame d) where
 
 namespace Particle
 
+variable (particle : frame.Particle)
+
 /-- A particle observed in an inertial frame has differentiable position. -/
-instance (particle : frame.Particle) [Fact frame.IsInertial] : Fact (Differentiable ℝ particle.pos) :=
+instance [Fact frame.IsInertial] : Fact (Differentiable ℝ particle.pos) :=
   ⟨particle.pos_twice_differentiable.left⟩
 
 /-- The first time derivative of the particle's coordinate position. -/
-def vel (particle : frame.Particle) [Fact (Differentiable ℝ particle.pos)] :
+def vel [Fact (Differentiable ℝ particle.pos)] :
     Time → frame.Vector :=
   Time.deriv particle.pos
 
 /-- A particle observed in an inertial frame has differentiable velocity. -/
-instance (particle : frame.Particle) [Fact frame.IsInertial] :  Fact (Differentiable ℝ particle.vel) :=
+instance [Fact frame.IsInertial] :  Fact (Differentiable ℝ particle.vel) :=
   ⟨particle.pos_twice_differentiable.right⟩
 
 /-- The second time derivative of the particle's coordinate position. -/
-def acc (particle : frame.Particle) [Fact (Differentiable ℝ particle.pos)]
-    [Fact (Differentiable ℝ particle.vel)] : Time → frame.Vector :=
+def acc [Fact (Differentiable ℝ particle.pos)] [Fact (Differentiable ℝ particle.vel)] :
+    Time → frame.Vector :=
   Time.deriv particle.vel
 
 /-- Convert the particle's coordinate position at `t` into a point of affine space. -/
-def pointInSpace (particle : frame.Particle) (t : Time) : Space d :=
+def pointInSpace (t : Time) : Space d :=
   Vector.dispEquiv t (particle.pos t) +ᵥ frame.origin t
 
 /-- m * v -/
-def momentum (particle : frame.Particle) [Fact (Differentiable ℝ particle.pos)]
-    (t : Time) : frame.Vector :=
+def momentum [Fact (Differentiable ℝ particle.pos)] (t : Time) : frame.Vector :=
   particle.mass • particle.vel t
 
 /-- m * |v|^2 / 2 -/
-def kineticEnergy (particle : frame.Particle) [Fact frame.IsMetricConserved]
-    [Fact (Differentiable ℝ particle.pos)] (t : Time) : ℝ :=
+def kineticEnergy [Fact frame.IsMetricConserved] [Fact (Differentiable ℝ particle.pos)]
+    (t : Time) : ℝ :=
   particle.mass * ‖particle.vel t‖ ^ 2 / 2
 
 end Particle
@@ -97,9 +98,9 @@ end Particle
 /-!
 ## B. Forces
 
-A `Force` represents one particular force, not the sum of all forces on a particle. An external force names only the
-particle it acts on, because its source lies outside the chosen system. An internal force also names its source particle
-within the system.
+A `Force` represents one particular force, not the sum of all forces on a particle.
+An external force names only the particle it acts on, because its source lies outside the
+chosen system. An internal force also names its source particle within the system.
 -/
 
 /-- A time-dependent force together with the particle on which it acts. -/
