@@ -13,7 +13,7 @@ public import Physlib.SpaceAndTime.ReferenceFrame
 # Particle mechanics
 
 This module describes particles and individual forces. A `Particle` has an inertial mass and a
-position at every time, expressed in one inertial frame. Velocity and acceleration are derived from
+position at every time, expressed in one reference frame. Velocity and acceleration are derived from
 that position. A `Force` gives the value of one force over time and names the particle on which it
 acts.
 
@@ -27,9 +27,9 @@ separately.
 
 open scoped BigOperators Classical
 
-namespace ClassicalMechanics.InertialReferenceFrame
+namespace ClassicalMechanics.ReferenceFrame
 
-variable {d : ℕ} {frame : InertialReferenceFrame d}
+variable {d : ℕ} {frame : ReferenceFrame d}
 
 /-- Values of `T` carrying evidence that they are strictly greater than zero. -/
 -- abbrev Type.Pos (T : Type) [LT T] [Zero T] := {x : T // 0 < x}
@@ -45,38 +45,51 @@ instance {α : Type*} [SMul ℝ α] : SMul ℝ+ α where
 
 In this model, a Newtonian point particle has mass but no orientation, shape, or internal degrees of
 freedom. It occupies one point in space at each time. The definition stores its position as
-coordinates relative to a chosen inertial frame.
+coordinates relative to a chosen reference frame.
 -/
 
 /-- A Newtonian point particle described relative to `frame`. -/
-structure Particle (frame : InertialReferenceFrame d) where
+structure Particle (frame : ReferenceFrame d) where
   /-- The particle's positive, time-independent inertial mass. -/
   mass : ℝ+
   /-- Its displacement from the frame origin, given in frame coordinates at every time. -/
   pos : Time → frame.Vector
-  /-- Enough regularity for both velocity and acceleration to be defined throughout the motion. -/
-  pos_twice_differentiable : Differentiable ℝ pos ∧ Differentiable ℝ (Time.deriv pos)
+  /-- In an inertial frame, the position and its derivative are differentiable. -/
+  pos_twice_differentiable [Fact frame.IsInertial] :
+    Differentiable ℝ pos ∧ Differentiable ℝ (Time.deriv pos)
 
 namespace Particle
 
+/-- A particle observed in an inertial frame has differentiable position. -/
+instance (particle : frame.Particle) [Fact frame.IsInertial] : Fact (Differentiable ℝ particle.pos) :=
+  ⟨particle.pos_twice_differentiable.left⟩
+
 /-- The first time derivative of the particle's coordinate position. -/
-def vel (particle : frame.Particle) : Time → frame.Vector :=
+def vel (particle : frame.Particle) [Fact (Differentiable ℝ particle.pos)] :
+    Time → frame.Vector :=
   Time.deriv particle.pos
 
+/-- A particle observed in an inertial frame has differentiable velocity. -/
+instance (particle : frame.Particle) [Fact frame.IsInertial] :  Fact (Differentiable ℝ particle.vel) :=
+  ⟨particle.pos_twice_differentiable.right⟩
+
 /-- The second time derivative of the particle's coordinate position. -/
-def acc (particle : frame.Particle) : Time → frame.Vector :=
+def acc (particle : frame.Particle) [Fact (Differentiable ℝ particle.pos)]
+    [Fact (Differentiable ℝ particle.vel)] : Time → frame.Vector :=
   Time.deriv particle.vel
 
 /-- Convert the particle's coordinate position at `t` into a point of affine space. -/
 def pointInSpace (particle : frame.Particle) (t : Time) : Space d :=
-  (particle.pos t).asDisplacement +ᵥ frame.origin t
+  Vector.dispEquiv t (particle.pos t) +ᵥ frame.origin t
 
 /-- m * v -/
-def momentum (particle : frame.Particle) (t : Time) : frame.Vector :=
+def momentum (particle : frame.Particle) [Fact (Differentiable ℝ particle.pos)]
+    (t : Time) : frame.Vector :=
   particle.mass • particle.vel t
 
 /-- m * |v|^2 / 2 -/
-def kineticEnergy (particle : frame.Particle) (t : Time) : ℝ :=
+def kineticEnergy (particle : frame.Particle) [Fact frame.IsMetricConserved]
+    [Fact (Differentiable ℝ particle.pos)] (t : Time) : ℝ :=
   particle.mass * ‖particle.vel t‖ ^ 2 / 2
 
 end Particle
@@ -90,7 +103,7 @@ within the system.
 -/
 
 /-- A time-dependent force together with the particle on which it acts. -/
-structure Force (frame : InertialReferenceFrame d) where
+structure Force (frame : ReferenceFrame d) where
   /-- The force vector at each time. -/
   value : Time → frame.Vector
   /-- The particle on which the force acts. -/
@@ -100,7 +113,7 @@ instance : CoeFun frame.Force (fun _ => Time → frame.Vector) where
   coe := Force.value
 
 /-- A force whose source and target are both explicit particles. -/
-structure InternalForce (frame : InertialReferenceFrame d) extends frame.Force where
+structure InternalForce (frame : ReferenceFrame d) extends frame.Force where
   /-- The particle that exerts the force. -/
   source : frame.Particle
   /-- An internal force must connect two distinct particles. -/
@@ -157,5 +170,3 @@ def Particle.netForce
     (t : Time) : frame.Vector :=
   (∑ force : internalForces.filter fun force => force.target = particle, force.1 t) +
     particle.netExternalForce externalForces t
-
-end ClassicalMechanics.InertialReferenceFrame

@@ -162,7 +162,3 @@ def params (self : Pendulum) : Params where
   g := self.g
   θ0 := self.θ 0
   ω0 := self.ω 0
-
-end Pendulum
-
-end ClassicalMechanics

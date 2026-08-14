@@ -30,7 +30,9 @@ variable {d : ℕ}
 /-- A finite collection of particles and forces satisfying Newton's laws. -/
 structure System (d : ℕ) where
   /-- The inertial frame in which all positions and force vectors are represented. -/
-  frame : InertialReferenceFrame d
+  frame : ReferenceFrame d
+  /-- Evidence that the system's frame is inertial. -/
+  [isInertial : Fact frame.IsInertial]
   /-- All particles included in the system. -/
   particles : Finset frame.Particle
   /-- The forces whose source and target are both particles in the system. -/
@@ -47,6 +49,9 @@ structure System (d : ℕ) where
   newton_third_law : internalForces.map .reverse = internalForces
 
 namespace System
+
+instance (system : System d) : Fact system.frame.IsInertial :=
+  system.isInertial
 
 /-!
 ## B. System particles
@@ -100,7 +105,3 @@ def momentum (system : System d) (t : Time) : system.Vector :=
 /-- The sum of the frame-relative kinetic energies of all particles in the system. -/
 def kineticEnergy (system : System d) (t : Time) : ℝ :=
   ∑ particle : system.Particle, particle.kineticEnergy t
-
-end System
-
-end ClassicalMechanics.ParticleMechanics

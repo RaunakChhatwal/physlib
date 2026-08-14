@@ -18,17 +18,12 @@ open scoped Finset
 open scoped Manifold
 open scoped Topology
 
-noncomputable local instance vector_finiteDimensional {d : ℕ}
-    {frame : InertialReferenceFrame d} : FiniteDimensional ℝ frame.Vector :=
-  FiniteDimensional.of_injective
-    (InertialReferenceFrame.Vector.componentLinearEquiv frame).toLinearMap
-    (InertialReferenceFrame.Vector.componentLinearEquiv frame).injective
-
-lemma vector_norm_l2_if_orthonormal {d : ℕ} {frame : InertialReferenceFrame d}
+lemma vector_norm_l2_if_orthonormal {d : ℕ} {frame : ReferenceFrame d}
+    [Fact frame.IsMetricConserved]
     (frame_orthonormal : frame.Orthonormal) (x : frame.Vector) :
     ‖x‖ = √(∑ i, (x.components i) ^ 2) := by
   let basis := frame.basis 0
-  let orthonormalBasis := basis.toOrthonormalBasis frame_orthonormal
+  let orthonormalBasis := basis.toOrthonormalBasis (frame_orthonormal 0)
   change ‖basis.equivFun.symm x.components‖ = _
   calc
     _ = ‖orthonormalBasis.repr.symm (WithLp.toLp 2 x.components)‖ := by rfl
@@ -55,15 +50,18 @@ lemma periodOption_eq_of_edist_eq_zero {x y : Option ℝ}
     x = y := by
   cases x <;> cases y <;> simp_all
 
-noncomputable def paramsFrame : InertialReferenceFrame 2 where
+noncomputable def paramsFrame : ReferenceFrame 2 where
   origin := fun _ ↦ Classical.choice inferInstance
   basis := fun _ ↦ (EuclideanSpace.basisFun (Fin 2) ℝ).toBasis
-  velocity := 0
-  origin_moves_uniformly := by simp
+
+lemma paramsFrame_isInertial : paramsFrame.IsInertial where
+  origin_moves_uniformly := ⟨0, by intro t₁ t₂; simp [paramsFrame]⟩
   basis_conserved := by intro _ _; rfl
 
+local instance : Fact paramsFrame.IsInertial := ⟨paramsFrame_isInertial⟩
+
 lemma paramsFrame_orthonormal : paramsFrame.Orthonormal :=
-  (EuclideanSpace.basisFun (Fin 2) ℝ).orthonormal
+  fun _ ↦ (EuclideanSpace.basisFun (Fin 2) ℝ).orthonormal
 
 def phaseField (params : Params) (state : ℝ × ℝ) : ℝ × ℝ :=
   (state.2, -params.g / params.L * Real.sin state.1)
@@ -297,14 +295,14 @@ lemma angularVelocity_hasDerivAt (params : Params) (t : ℝ) :
   convert (ContinuousLinearMap.snd ℝ ℝ ℝ).hasFDerivAt.comp_hasDerivAt t
     (phase_hasDerivAt params t) using 1 <;> rfl
 
-def vectorCLM (frame : InertialReferenceFrame 2) :
+def vectorCLM (frame : ReferenceFrame 2) [Fact frame.IsMetricConserved] :
     (Fin 2 → ℝ) →L[ℝ] frame.Vector := by
   exact LinearMap.toContinuousLinearMap
-    { toFun := InertialReferenceFrame.Vector.mk
+    { toFun := ReferenceFrame.Vector.mk
       map_add' := fun _ _ ↦ rfl
       map_smul' := fun _ _ ↦ rfl }
 
-lemma vector_eq_of_components {frame : InertialReferenceFrame 2}
+lemma vector_eq_of_components {frame : ReferenceFrame 2}
     {x y : frame.Vector} (components_eq : ∀ i, x.components i = y.components i) :
     x = y := by
   rcases x with ⟨x⟩
@@ -314,37 +312,37 @@ lemma vector_eq_of_components {frame : InertialReferenceFrame 2}
   exact components_eq i
 
 @[simp]
-lemma components_add {frame : InertialReferenceFrame 2}
+lemma components_add {frame : ReferenceFrame 2}
     (x y : frame.Vector) (i : Fin 2) :
     (x + y).components i = x.components i + y.components i :=
   rfl
 
 @[simp]
-lemma components_smul {frame : InertialReferenceFrame 2}
+lemma components_smul {frame : ReferenceFrame 2}
     (c : ℝ) (x : frame.Vector) (i : Fin 2) :
     (c • x).components i = c * x.components i :=
   rfl
 
 @[simp]
-lemma components_neg {frame : InertialReferenceFrame 2}
+lemma components_neg {frame : ReferenceFrame 2}
     (x : frame.Vector) (i : Fin 2) :
     (-x).components i = -x.components i :=
   rfl
 
 @[simp]
-lemma components_sub {frame : InertialReferenceFrame 2}
+lemma components_sub {frame : ReferenceFrame 2}
     (x y : frame.Vector) (i : Fin 2) :
     (x - y).components i = x.components i - y.components i :=
   rfl
 
 @[simp]
-lemma components_positive_smul {frame : InertialReferenceFrame 2}
+lemma components_positive_smul {frame : ReferenceFrame 2}
     (c : ℝ+) (x : frame.Vector) (i : Fin 2) :
     (c • x).components i = c.val * x.components i :=
   rfl
 
 @[simp]
-lemma components_zero {frame : InertialReferenceFrame 2} (i : Fin 2) :
+lemma components_zero {frame : ReferenceFrame 2} (i : Fin 2) :
     (0 : frame.Vector).components i = 0 :=
   rfl
 
@@ -457,6 +455,7 @@ def paramsPivot (params : Params) : paramsFrame.Particle where
   mass := params.pivotMass
   pos := 0
   pos_twice_differentiable := by
+    intro
     constructor
     · fun_prop
     · have derivative_zero : Time.deriv (0 : Time → paramsFrame.Vector) = 0 := by
@@ -469,6 +468,7 @@ def paramsBob (params : Params) : paramsFrame.Particle where
   mass := params.bobMass
   pos := fun t ↦ bobPosition params t.val
   pos_twice_differentiable := by
+    intro
     constructor
     · exact (bobPosition_twice_differentiable params).1.fun_comp Time.val_differentiable
     · rw [time_deriv_bobPosition]
@@ -501,7 +501,7 @@ lemma paramsPivot_ne_paramsBob (params : Params) :
     paramsPivot params ≠ paramsBob params := by
   intro particles_eq
   exact paramsPivot_pos_ne_paramsBob_pos params
-    (congrArg InertialReferenceFrame.Particle.pos particles_eq)
+    (congrArg ReferenceFrame.Particle.pos particles_eq)
 
 def paramsGravity (params : Params) (particle : paramsFrame.Particle) :
     paramsFrame.Force where
@@ -522,12 +522,12 @@ def paramsSupportForce (params : Params) : paramsFrame.Force where
 
 lemma paramsBob_acc (params : Params) :
     (paramsBob params).acc = fun t ↦ bobAcceleration params t.val := by
-  rw [InertialReferenceFrame.Particle.acc, InertialReferenceFrame.Particle.vel, paramsBob,
+  rw [ReferenceFrame.Particle.acc, ReferenceFrame.Particle.vel, paramsBob,
     time_deriv_bobPosition, time_deriv_bobVelocity]
 
 lemma paramsPivot_acc (params : Params) :
     (paramsPivot params).acc = 0 := by
-  rw [InertialReferenceFrame.Particle.acc, InertialReferenceFrame.Particle.vel, paramsPivot]
+  rw [ReferenceFrame.Particle.acc, ReferenceFrame.Particle.vel, paramsPivot]
   have derivative_zero : Time.deriv (0 : Time → paramsFrame.Vector) = 0 := by
     funext t
     exact Time.deriv_const (t := t) 0
@@ -580,10 +580,10 @@ lemma params_multiset_sum_eq_fintype_sum
     (((Finset.univ : Finset s).val.map fun x : s ↦ f x.1).sum)
   rw [Multiset.map_univ]
 
-lemma internalForce_reverse_reverse {frame : InertialReferenceFrame 2}
+lemma internalForce_reverse_reverse {frame : ReferenceFrame 2}
     (force : frame.InternalForce) : force.reverse.reverse = force := by
   rcases force with ⟨⟨value, target⟩, source, source_ne_target⟩
-  simp [InertialReferenceFrame.InternalForce.reverse]
+  simp [ReferenceFrame.InternalForce.reverse]
 
 lemma paramsBob_netForce (params : Params) (t : ℝ) :
     (paramsBob params).netForce
@@ -625,8 +625,8 @@ lemma paramsBob_netForce (params : Params) (t : ℝ) :
         (p := fun force : paramsFrame.Force ↦ force.target = paramsBob params) _
         (paramsPivot_ne_paramsBob params)]
     simp
-  simp only [InertialReferenceFrame.Particle.netForce,
-    InertialReferenceFrame.Particle.netExternalForce]
+  simp only [ReferenceFrame.Particle.netForce,
+    ReferenceFrame.Particle.netExternalForce]
   rw [internal_filter, external_filter,
     ← params_multiset_sum_eq_fintype_sum {paramsTension params} (fun force ↦ force t),
     ← params_multiset_sum_eq_fintype_sum {paramsGravity params (paramsBob params)}
@@ -675,8 +675,8 @@ lemma paramsPivot_netForce (params : Params) (t : ℝ) :
       Multiset.filter_cons_of_pos
       (p := fun force : paramsFrame.Force ↦ force.target = paramsPivot params) _ rfl]
     simp
-  simp only [InertialReferenceFrame.Particle.netForce,
-    InertialReferenceFrame.Particle.netExternalForce]
+  simp only [ReferenceFrame.Particle.netForce,
+    ReferenceFrame.Particle.netExternalForce]
   rw [internal_filter, external_filter,
     ← params_multiset_sum_eq_fintype_sum {(paramsTension params).reverse}
       (fun force ↦ force t),
@@ -694,8 +694,8 @@ def paramsSystem (params : Params) : ParticleMechanics.System 2 where
     paramsGravity params (paramsPivot params), paramsSupportForce params}
   forces_involve_self := by
     intro particle particle_mem
-    simpa [InertialReferenceFrame.particlesInvolved, paramsTension, paramsGravity,
-      paramsSupportForce, InertialReferenceFrame.InternalForce.reverse, or_comm] using particle_mem
+    simpa [ReferenceFrame.particlesInvolved, paramsTension, paramsGravity,
+      paramsSupportForce, ReferenceFrame.InternalForce.reverse, or_comm] using particle_mem
   newton_second_law := by
     intro particle particle_mem t
     simp only [Finset.mem_insert, Finset.mem_singleton] at particle_mem
@@ -1018,7 +1018,7 @@ lemma angular_velocity_eq (self : Pendulum) (t : Time) :
   have pos_has_deriv : HasDerivAt
       (fun s : ℝ ↦ self.bob.pos (Time.toRealCLE.symm s)) (self.bob.vel t) τ := by
     simpa only [τ, ContinuousLinearEquiv.symm_apply_apply,
-      InertialReferenceFrame.Particle.vel] using
+      ReferenceFrame.Particle.vel] using
       hasDerivAt_comp_toRealCLE_symm self.bob.pos τ
         (self.bob.pos_twice_differentiable.1.differentiableAt)
   have x_has_deriv : HasDerivAt x vx τ := by
@@ -1102,13 +1102,13 @@ lemma angular_acceleration_eq (self : Pendulum) (t : Time) :
   have pos_has_deriv : HasDerivAt
       (fun s : ℝ ↦ self.bob.pos (Time.toRealCLE.symm s)) (self.bob.vel t) τ := by
     simpa only [τ, ContinuousLinearEquiv.symm_apply_apply,
-      InertialReferenceFrame.Particle.vel] using
+      ReferenceFrame.Particle.vel] using
       hasDerivAt_comp_toRealCLE_symm self.bob.pos τ
         self.bob.pos_twice_differentiable.1.differentiableAt
   have vel_has_deriv : HasDerivAt
       (fun s : ℝ ↦ self.bob.vel (Time.toRealCLE.symm s)) (self.bob.acc t) τ := by
     simpa only [τ, ContinuousLinearEquiv.symm_apply_apply,
-      InertialReferenceFrame.Particle.acc] using
+      ReferenceFrame.Particle.acc] using
       hasDerivAt_comp_toRealCLE_symm self.bob.vel τ
         self.bob.pos_twice_differentiable.2.differentiableAt
   have x_has_deriv : HasDerivAt x (vx τ) τ := by
@@ -1148,7 +1148,7 @@ lemma tension_source_eq_pivot (self : Pendulum) :
     simp
   have source_mem : self.tension.source ∈ self.particles := by
     apply self.forces_involve_self
-    simp only [InertialReferenceFrame.particlesInvolved, Finset.mem_union,
+    simp only [ReferenceFrame.particlesInvolved, Finset.mem_union,
       Multiset.mem_toFinset, Multiset.mem_map]
     left
     left
@@ -1237,8 +1237,8 @@ lemma bob_newton_second_law (self : Pendulum) (t : Time) :
       Multiset.filter_cons_of_neg
         (p := fun force : self.frame.Force ↦ force.target = self.bob) _ support_target_ne]
     simp
-  simp only [InertialReferenceFrame.Particle.netForce,
-    InertialReferenceFrame.Particle.netExternalForce] at second_law
+  simp only [ReferenceFrame.Particle.netForce,
+    ReferenceFrame.Particle.netExternalForce] at second_law
   rw [internal_filter, external_filter] at second_law
   rw [← multiset_sum_eq_fintype_sum {self.tension} (fun force ↦ force t),
     ← multiset_sum_eq_fintype_sum {gravity self.bob self.g} (fun force ↦ force t)] at second_law
@@ -1358,7 +1358,7 @@ lemma specs_uniqueness (system : ParticleMechanics.System 2) (self : Specs syste
       simp
     have source_mem : specs.tension.source ∈ system.particles := by
       apply system.forces_involve_self
-      simp only [InertialReferenceFrame.particlesInvolved, Finset.mem_union,
+      simp only [ReferenceFrame.particlesInvolved, Finset.mem_union,
         Multiset.mem_toFinset, Multiset.mem_map]
       left
       left
@@ -1454,7 +1454,7 @@ lemma specs_uniqueness (system : ParticleMechanics.System 2) (self : Specs syste
       calc
         self.pivot = (gravity self.pivot self.g).target := rfl
         _ = (gravity other.bob other.g).target :=
-          congrArg InertialReferenceFrame.Force.target gravity_eq_pivot.symm
+          congrArg ReferenceFrame.Force.target gravity_eq_pivot.symm
         _ = other.bob := rfl
         _ = self.bob := congrArg ParticleMechanics.System.Particle.toParticle bob_eq
     · exfalso
@@ -1462,7 +1462,7 @@ lemma specs_uniqueness (system : ParticleMechanics.System 2) (self : Specs syste
       apply particle_eq_of_toParticle_eq
       calc
         self.pivot = self.pivotSupportForce.target := self.support_targets_pivot.symm
-        _ = (gravity other.bob other.g).target := congrArg InertialReferenceFrame.Force.target
+        _ = (gravity other.bob other.g).target := congrArg ReferenceFrame.Force.target
           gravity_eq_support.symm
         _ = other.bob := rfl
         _ = self.bob := congrArg ParticleMechanics.System.Particle.toParticle bob_eq
@@ -2134,7 +2134,7 @@ lemma angularVelocity_differentiable (self : Pendulum) :
   have position_differentiable : Differentiable ℝ self.bob.pos :=
     self.bob.pos_twice_differentiable.1
   have velocity_differentiable : Differentiable ℝ self.bob.vel := by
-    simpa only [InertialReferenceFrame.Particle.vel] using
+    simpa only [ReferenceFrame.Particle.vel] using
       self.bob.pos_twice_differentiable.2
   have x_differentiable : Differentiable ℝ x := fun t ↦ by
     exact ((componentCLM (system := self.toSystem) 0).hasFDerivAt.comp t
@@ -2181,7 +2181,7 @@ lemma velocity_components_eq (self : Pendulum) (t : Time) :
   have position_deriv : HasDerivAt
       (fun s : ℝ ↦ self.bob.pos (Time.toRealCLE.symm s)) (self.bob.vel t) τ := by
     simpa only [τ, ContinuousLinearEquiv.symm_apply_apply,
-      InertialReferenceFrame.Particle.vel] using
+      ReferenceFrame.Particle.vel] using
       hasDerivAt_comp_toRealCLE_symm self.bob.pos τ
         self.bob.pos_twice_differentiable.1.differentiableAt
   have x_deriv : HasDerivAt x vx τ := by
@@ -2250,7 +2250,7 @@ lemma pendulumCirclePhase_hasDerivAt (self : Pendulum) (t : ℝ) :
   have position_deriv : HasDerivAt
       (fun s : ℝ ↦ self.bob.pos (Time.toRealCLE.symm s))
       (self.bob.vel (Time.toRealCLE.symm t)) t := by
-    simpa only [InertialReferenceFrame.Particle.vel] using
+    simpa only [ReferenceFrame.Particle.vel] using
       hasDerivAt_comp_toRealCLE_symm self.bob.pos t
         self.bob.pos_twice_differentiable.1.differentiableAt
   have x_deriv : HasDerivAt

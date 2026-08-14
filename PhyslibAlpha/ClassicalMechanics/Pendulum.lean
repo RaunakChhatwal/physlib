@@ -31,7 +31,7 @@ central tension, fixed length, and uniform gravity. It is derived rather than se
 the definition of a pendulum.
 -/
 
-/-- θ̈'' = -(g/L) sin θ -/
+/-- θ'' = -(g/L) sin θ -/
 theorem differential_equation (self : Pendulum) (t : Time) :
     Time.deriv self.ω t = -self.g / self.L * Real.Angle.sin (self.θ t) :=
   Internal.differential_equation self t
@@ -84,5 +84,3 @@ theorem small_angle_period (params : Params) (from_rest : params.ω0 = 0) :
       (𝓝[≠] 0)
       (𝓝 <| some <| 2 * Real.pi * √(params.L / params.g)) :=
   Internal.small_angle_period (by simp) params from_rest
-
-end ClassicalMechanics.Pendulum
