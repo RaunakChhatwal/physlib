@@ -44,7 +44,7 @@ A reference frame can be pictured as a coordinate grid carried through time. It 
 motion is described, not an additional physical object moving with the particles.
 -/
 
--- TODO: add timeOrigin to enable time translations
+TODO "Add `timeOrigin` to enable time translations."
 /-- A time-indexed choice of affine origin and displacement basis in `d`-dimensional space. -/
 structure ReferenceFrame (d : ℕ) where
   /-- The point assigned coordinate zero at each time. -/
@@ -175,7 +175,7 @@ def contDispEquiv (t : Time) : frame.Vector ≃L[ℝ] EuclideanSpace ℝ (Fin d)
   (componentContLinearEquiv frame).trans (frame.basis t).equivFun.toContinuousLinearEquiv.symm
 
 /-- The physical norm on frame vectors, pulled back from geometric displacement space. -/
-instance [Fact frame.IsMetricConserved] : NormedAddCommGroup frame.Vector :=
+instance [_h : Fact frame.IsMetricConserved] : NormedAddCommGroup frame.Vector :=
   let normedSpace :=
     NormedAddCommGroup.induced _ _ (dispEquiv 0).toLinearMap (dispEquiv 0).injective
   let metricSpace :=
@@ -211,3 +211,7 @@ lemma inner_euclidean_if_orthonormal [h : Fact frame.Orthonormal] :
         (basis.repr.symm <| WithLp.toLp 2 w.components) := by rfl
     _ = inner ℝ (WithLp.toLp 2 v.components) _ := by rw [basis.repr.symm.inner_map_map]
     _ = _ := by rw [PiLp.inner_apply]; simp_rw [Real.inner_apply]
+
+end ClassicalMechanics.ReferenceFrame.Vector
+
+end
