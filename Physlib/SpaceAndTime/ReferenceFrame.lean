@@ -127,13 +127,15 @@ instance [h : Fact frame.IsInertial] : Fact frame.IsMetricConserved := ⟨h.out.
 /-!
 ## C. Vectors in a reference frame
 
-`frame.Vector` stores the coordinates of a displacement; it is not a second kind of geometric
-displacement. Its dependence on `frame` records which basis gives those coordinates their meaning.
-The map `dispEquiv` converts the coordinates back into the displacement they represent at a
-given time.
+`frame.Vector` is the common coordinate carrier for vector quantities expressed relative to
+`frame`. It intentionally records the coordinate frame but not the physical dimension, so relative
+position, velocity, acceleration, force, momentum, and similar quantities can use the same
+componentwise calculations. Their different physical roles, units, and transformation laws must be
+supplied by the surrounding definitions. When a vector represents a displacement, `dispEquiv`
+converts its coordinates into the corresponding geometric displacement at a given time.
 -/
 
-/-- The `d` real components used to represent a displacement in `frame`. -/
+/-- The `d` real components used to express a vector quantity relative to `frame`. -/
 structure Vector (frame : ReferenceFrame d) where
   /-- One scalar coefficient for each axis of the frame. -/
   components : Fin d → ℝ
