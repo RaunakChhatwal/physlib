@@ -7,6 +7,7 @@ module
 
 public import Mathlib.Analysis.Normed.Field.Lemmas
 public import Mathlib.Tactic.DeriveFintype
+public import Physlib.Units.Exponent
 /-!
 
 # Dimension
@@ -14,8 +15,8 @@ public import Mathlib.Tactic.DeriveFintype
 In this module we define the type `Dimension` which carries the dimension
 of a physical quantity.
 
-A `Dimension B` is parameterised by a *basis* `B` of base dimensions: it assigns a
-rational `exponent` to each base dimension `b : B`. The parameterisation is purely in
+A `Dimension B` is parameterised by a *basis* `B` of base dimensions: it assigns an
+`Exponent` to each base dimension `b : B`. The parameterisation is purely in
 the dimensional *algebra*: `Dimension B` is a `CommGroup` for every `B`
 (multiplication adds exponents, inversion negates them), so quantities can be typed by
 dimensions over any basis. The commutative-group and `ℚ`-power structure, decidable
@@ -41,11 +42,11 @@ open NNReal
 
 -/
 
-/-- A dimension over a basis `B` of base dimensions: a rational `exponent` for each
+/-- A dimension over a basis `B` of base dimensions: an `Exponent` for each
   base dimension `b : B`. PhysLib's default basis is `LTMCTDimensionBase`. -/
 structure Dimension (B : Type) where
   /-- The exponent of each base dimension. -/
-  exponent : B → ℚ
+  exponent : B → Dimension.Exponent
 
 namespace Dimension
 
@@ -106,11 +107,11 @@ lemma npow_exponent (d : Dimension B) (n : ℕ) (b : B) :
   | succ n ih => rw [pow_succ, mul_exponent, ih, succ_nsmul]
 
 instance : Pow (Dimension B) ℚ where
-  pow d q := ⟨fun b => d.exponent b * q⟩
+  pow d q := ⟨fun b => d.exponent b * Exponent.ofRat q⟩
 
 @[simp]
 lemma qpow_exponent (d : Dimension B) (q : ℚ) (b : B) :
-    (d ^ q).exponent b = d.exponent b * q := rfl
+    (d ^ q).exponent b = d.exponent b * Exponent.ofRat q := rfl
 
 /-- Decidable equality of dimensions over a finite basis `B`. -/
 instance [Fintype B] : DecidableEq (Dimension B) := fun d1 d2 =>

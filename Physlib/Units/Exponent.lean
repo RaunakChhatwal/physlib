@@ -48,6 +48,12 @@ namespace Exponent
 def equivRat : Exponent ≃ ℚ :=
   Equiv.mk Exponent.toRat Exponent.mk Eq.refl Eq.refl
 
+/-- Regard a rational number as a dimension exponent. -/
+def ofRat (q : ℚ) : Exponent := ⟨q⟩
+
+@[simp]
+lemma ofRat_toRat (q : ℚ) : (ofRat q).toRat = q := rfl
+
 /-- Fuel-bounded Euclidean algorithm used to make exponent normalization reducible. -/
 def gcdAux : Nat → Nat → Nat → Nat
   | 0, _, n => n
@@ -178,6 +184,15 @@ instance instField : Field Exponent := by
   case mul => apply mul_equiv
   case div => apply div_equiv
   all_goals rfl
+
+/-- The ring equivalence between dimension exponents and rational numbers. -/
+def ringEquivRat : Exponent ≃+* ℚ where
+  toEquiv := equivRat
+  map_add' := add_equiv
+  map_mul' := mul_equiv
+
+/-- Regard a dimension exponent as a rational number. -/
+instance : Coe Exponent ℚ := ⟨ringEquivRat⟩
 
 instance : CharZero Exponent where
   cast_injective _ _ equality := Nat.cast_injective <| congrArg equivRat equality

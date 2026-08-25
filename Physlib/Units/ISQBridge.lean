@@ -106,9 +106,10 @@ lemma toISQHom_injective : Function.Injective toISQHom := by
   cases b with
   | length => simpa only [toISQFun] using key .length
   | time =>
-      have ht := key .time
-      have hc := key .current
-      simp only [toISQFun] at ht hc
+      apply Exponent.ringEquivRat.injective
+      have ht := congrArg Exponent.ringEquivRat (key .time)
+      have hc := congrArg Exponent.ringEquivRat (key .current)
+      simp only [toISQFun, map_add] at ht hc
       linarith
   | mass => simpa only [toISQFun] using key .mass
   | charge => simpa only [toISQFun] using key .current

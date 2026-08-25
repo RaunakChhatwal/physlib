@@ -60,19 +60,20 @@ the familiar `.length`, `.time`, `.mass`, `.charge`, `.temperature` API is avail
 -/
 
 /-- The length exponent of a `LTMCTDimensionBase` dimension. -/
-def length (d : Dimension LTMCTDimensionBase) : ℚ := d.exponent .length
+def length (d : Dimension LTMCTDimensionBase) : Exponent := d.exponent .length
 /-- The time exponent of a `LTMCTDimensionBase` dimension. -/
-def time (d : Dimension LTMCTDimensionBase) : ℚ := d.exponent .time
+def time (d : Dimension LTMCTDimensionBase) : Exponent := d.exponent .time
 /-- The mass exponent of a `LTMCTDimensionBase` dimension. -/
-def mass (d : Dimension LTMCTDimensionBase) : ℚ := d.exponent .mass
+def mass (d : Dimension LTMCTDimensionBase) : Exponent := d.exponent .mass
 /-- The charge exponent of a `LTMCTDimensionBase` dimension. -/
-def charge (d : Dimension LTMCTDimensionBase) : ℚ := d.exponent .charge
+def charge (d : Dimension LTMCTDimensionBase) : Exponent := d.exponent .charge
 /-- The temperature exponent of a `LTMCTDimensionBase` dimension. -/
-def temperature (d : Dimension LTMCTDimensionBase) : ℚ := d.exponent .temperature
+def temperature (d : Dimension LTMCTDimensionBase) : Exponent := d.exponent .temperature
 
 /-- Build a `LTMCTDimensionBase` dimension from its five exponents, in the order
   `⟨length, time, mass, charge, temperature⟩`. -/
-def ofLTMCTDimensionBase (length time mass charge temperature : ℚ) : Dimension LTMCTDimensionBase :=
+def ofLTMCTDimensionBase (length time mass charge temperature : Exponent) :
+    Dimension LTMCTDimensionBase :=
   ⟨fun
     | .length => length
     | .time => time
@@ -81,23 +82,23 @@ def ofLTMCTDimensionBase (length time mass charge temperature : ℚ) : Dimension
     | .temperature => temperature⟩
 
 @[simp]
-lemma ofLTMCTDimensionBase_length (l t m c θ : ℚ) :
+lemma ofLTMCTDimensionBase_length (l t m c θ : Exponent) :
     (ofLTMCTDimensionBase l t m c θ).length = l := rfl
 
 @[simp]
-lemma ofLTMCTDimensionBase_time (l t m c θ : ℚ) :
+lemma ofLTMCTDimensionBase_time (l t m c θ : Exponent) :
     (ofLTMCTDimensionBase l t m c θ).time = t := rfl
 
 @[simp]
-lemma ofLTMCTDimensionBase_mass (l t m c θ : ℚ) :
+lemma ofLTMCTDimensionBase_mass (l t m c θ : Exponent) :
     (ofLTMCTDimensionBase l t m c θ).mass = m := rfl
 
 @[simp]
-lemma ofLTMCTDimensionBase_charge (l t m c θ : ℚ) :
+lemma ofLTMCTDimensionBase_charge (l t m c θ : Exponent) :
     (ofLTMCTDimensionBase l t m c θ).charge = c := rfl
 
 @[simp]
-lemma ofLTMCTDimensionBase_temperature (l t m c θ : ℚ) :
+lemma ofLTMCTDimensionBase_temperature (l t m c θ : Exponent) :
     (ofLTMCTDimensionBase l t m c θ).temperature = θ := rfl
 
 @[simp]
