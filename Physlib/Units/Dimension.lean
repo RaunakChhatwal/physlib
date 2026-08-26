@@ -20,7 +20,7 @@ A `Dimension B` is parameterised by a *basis* `B` of base dimensions equipped wi
 `Exponent` to every base dimension `b : B`. The parameterisation is purely in
 the dimensional *algebra*: `Dimension B` is a `CommGroup` for every represented basis `B`
 (multiplication adds exponents, inversion negates them), so quantities can be typed by
-dimensions over any basis. The commutative-group and `ℚ`-power structure, decidable
+dimensions over any basis. The commutative-group, `Exponent`- and `ℚ`-power structures, decidable
 equality (`DecidableEq`), the base vectors `single b`, and the change-of-basis map
 `extend` are all generic in `B`.
 
@@ -153,6 +153,17 @@ instance : Pow (Dimension B) ℚ where
 @[simp]
 lemma qpow_exponent (d : Dimension B) (q : ℚ) (b : B) :
     (d ^ q).exponent b = d.exponent b * Exponent.ofRat q := by
+  exact ofFunction_exponent _ _
+
+/-- Raising a dimension to an `Exponent` power. Unlike the `ℚ`-valued power, this preserves
+reducible arithmetic for concrete fractional exponents. -/
+@[default_instance 10000]
+instance : Pow (Dimension B) Exponent where
+  pow d c := ofFunction fun b => d.exponent b * c
+
+@[simp]
+lemma epow_exponent (d : Dimension B) (c : Exponent) (b : B) :
+    (d ^ c).exponent b = d.exponent b * c := by
   exact ofFunction_exponent _ _
 
 /-- Decidable equality of dimensions over a finite basis `B`. -/

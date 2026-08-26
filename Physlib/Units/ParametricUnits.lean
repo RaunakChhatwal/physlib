@@ -59,7 +59,7 @@ noncomputable def dimScale [DimensionBasis B] [Fintype B]
   toFun d := ∏ b, (u1.scale b / u2.scale b) ^ (d.exponent b : ℝ)
   map_one' := by simp
   map_mul' d1 d2 := by
-    simp only [Dimension.mul_exponent, map_add, Rat.cast_add]
+    simp only [Dimension.mul_exponent, Dimension.Exponent.coe_add, Rat.cast_add]
     rw [← Finset.prod_mul_distrib]
     exact Finset.prod_congr rfl fun b _ =>
       NNReal.rpow_add (u1.ratio_ne_zero u2 b) _ _

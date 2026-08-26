@@ -58,6 +58,17 @@ example (v : WithDim (L𝓭 / T𝓭) ℝ) (t : WithDim T𝓭 ℝ) : WithDim L�
 example (x : WithDim L𝓭 ℝ) (v : WithDim (L𝓭 / T𝓭) ℝ) (t : WithDim T𝓭 ℝ) : Prop :=
   x = v * t
 
+/-- Two half-powers of length multiply definitionally to length. The unannotated exponent also
+regresses the default away from natural-number division. -/
+example : (L𝓭 ^ (1 / 2)) * (L𝓭 ^ (1 / 2)) = L𝓭 := rfl
+
+/-- Reducible dimension powers also cancel for non-half fractional exponents. -/
+example : (L𝓭 ^ (2 / 3 : Exponent)) * (L𝓭 ^ (1 / 3 : Exponent)) = L𝓭 := rfl
+
+/-- Quantities carrying half-powers of length multiply directly to a length. -/
+example (a b : WithDim (L𝓭 ^ (1 / 2)) ℝ) : WithDim L𝓭 ℝ :=
+  a * b
+
 /-!
 ## The same comparison over a non-standard basis
 

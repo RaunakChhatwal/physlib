@@ -180,49 +180,53 @@ lemma inv_charge (d : Dimension LTMCTDimensionBase) : d⁻¹.charge = -d.charge 
 @[simp]
 lemma inv_temperature (d : Dimension LTMCTDimensionBase) : d⁻¹.temperature = -d.temperature := rfl
 
+private lemma component_npow (component : Dimension LTMCTDimensionBase → Exponent)
+    (b : LTMCTDimensionBase) (h : ∀ d, d.exponent b = component d)
+    (d : Dimension LTMCTDimensionBase) (n : ℕ) :
+    component (d ^ n) = n • component d := by
+  calc
+    component (d ^ n) = (d ^ n).exponent b := (h _).symm
+    _ = n • d.exponent b := npow_exponent d n b
+    _ = n • component d := congrArg (n • ·) (h _)
+
 @[simp]
 lemma div_length (d1 d2 : Dimension LTMCTDimensionBase) :
-    (d1 / d2).length = d1.length - d2.length := by
-  simpa only [exponent_length] using div_exponent d1 d2 .length
+    (d1 / d2).length = d1.length - d2.length := rfl
 
 @[simp]
-lemma div_time (d1 d2 : Dimension LTMCTDimensionBase) : (d1 / d2).time = d1.time - d2.time := by
-  simpa only [exponent_time] using div_exponent d1 d2 .time
+lemma div_time (d1 d2 : Dimension LTMCTDimensionBase) : (d1 / d2).time = d1.time - d2.time := rfl
 
 @[simp]
-lemma div_mass (d1 d2 : Dimension LTMCTDimensionBase) : (d1 / d2).mass = d1.mass - d2.mass := by
-  simpa only [exponent_mass] using div_exponent d1 d2 .mass
+lemma div_mass (d1 d2 : Dimension LTMCTDimensionBase) : (d1 / d2).mass = d1.mass - d2.mass := rfl
 
 @[simp]
 lemma div_charge (d1 d2 : Dimension LTMCTDimensionBase) :
-    (d1 / d2).charge = d1.charge - d2.charge := by
-  simpa only [exponent_charge] using div_exponent d1 d2 .charge
+    (d1 / d2).charge = d1.charge - d2.charge := rfl
 
 @[simp]
 lemma div_temperature (d1 d2 : Dimension LTMCTDimensionBase) :
-    (d1 / d2).temperature = d1.temperature - d2.temperature := by
-  simpa only [exponent_temperature] using div_exponent d1 d2 .temperature
+    (d1 / d2).temperature = d1.temperature - d2.temperature := rfl
 
 @[simp]
 lemma npow_length (d : Dimension LTMCTDimensionBase) (n : ℕ) : (d ^ n).length = n • d.length := by
-  simpa only [exponent_length] using npow_exponent d n .length
+  exact component_npow length .length exponent_length d n
 
 @[simp]
 lemma npow_time (d : Dimension LTMCTDimensionBase) (n : ℕ) : (d ^ n).time = n • d.time := by
-  simpa only [exponent_time] using npow_exponent d n .time
+  exact component_npow time .time exponent_time d n
 
 @[simp]
 lemma npow_mass (d : Dimension LTMCTDimensionBase) (n : ℕ) : (d ^ n).mass = n • d.mass := by
-  simpa only [exponent_mass] using npow_exponent d n .mass
+  exact component_npow mass .mass exponent_mass d n
 
 @[simp]
 lemma npow_charge (d : Dimension LTMCTDimensionBase) (n : ℕ) : (d ^ n).charge = n • d.charge := by
-  simpa only [exponent_charge] using npow_exponent d n .charge
+  exact component_npow charge .charge exponent_charge d n
 
 @[simp]
 lemma npow_temperature (d : Dimension LTMCTDimensionBase) (n : ℕ) :
     (d ^ n).temperature = n • d.temperature := by
-  simpa only [exponent_temperature] using npow_exponent d n .temperature
+  exact component_npow temperature .temperature exponent_temperature d n
 
 /-- The dimension corresponding to length. -/
 def L𝓭 : Dimension LTMCTDimensionBase := ofLTMCTDimensionBase 1 0 0 0 0
@@ -278,19 +282,14 @@ corresponding base dimension, exhibiting them as instances of the basis-generic 
 
 -/
 
-lemma L𝓭_eq_single : L𝓭 = single .length := by
-  ext b; cases b <;> simp [L𝓭, ofLTMCTDimensionBase, length, time, mass, charge, temperature]
+lemma L𝓭_eq_single : L𝓭 = single .length := rfl
 
-lemma T𝓭_eq_single : T𝓭 = single .time := by
-  ext b; cases b <;> simp [T𝓭, ofLTMCTDimensionBase, length, time, mass, charge, temperature]
+lemma T𝓭_eq_single : T𝓭 = single .time := rfl
 
-lemma M𝓭_eq_single : M𝓭 = single .mass := by
-  ext b; cases b <;> simp [M𝓭, ofLTMCTDimensionBase, length, time, mass, charge, temperature]
+lemma M𝓭_eq_single : M𝓭 = single .mass := rfl
 
-lemma C𝓭_eq_single : C𝓭 = single .charge := by
-  ext b; cases b <;> simp [C𝓭, ofLTMCTDimensionBase, length, time, mass, charge, temperature]
+lemma C𝓭_eq_single : C𝓭 = single .charge := rfl
 
-lemma Θ𝓭_eq_single : Θ𝓭 = single .temperature := by
-  ext b; cases b <;> simp [Θ𝓭, ofLTMCTDimensionBase, length, time, mass, charge, temperature]
+lemma Θ𝓭_eq_single : Θ𝓭 = single .temperature := rfl
 
 end Dimension

@@ -106,10 +106,9 @@ lemma toISQHom_injective : Function.Injective toISQHom := by
   cases b with
   | length => simpa only [toISQFun, ofFunction_exponent] using key .length
   | time =>
-      apply Exponent.ringEquivRat.injective
-      have ht := congrArg Exponent.ringEquivRat (key .time)
-      have hc := congrArg Exponent.ringEquivRat (key .current)
-      simp only [toISQFun, ofFunction_exponent, map_add] at ht hc
+      have ht := key .time
+      have hc := key .current
+      simp only [toISQFun, ofFunction_exponent] at ht hc
       linarith
   | mass => simpa only [toISQFun, ofFunction_exponent] using key .mass
   | charge => simpa only [toISQFun, ofFunction_exponent] using key .current
@@ -142,7 +141,6 @@ lemma isqToLTMCT_comp_ltmctToISQ :
   maps to the *derived* ISQ charge `I · T`. -/
 lemma toISQHom_C𝓭 : toISQHom C𝓭 = ISQDimensionBase.charge := by
   ext b
-  cases b <;> simp [toISQHom_apply, toISQFun, C𝓭, ofLTMCTDimensionBase,
-    ISQDimensionBase.charge, single_exponent, length, time, mass, charge, temperature]
+  cases b <;> simp [toISQHom_apply, toISQFun, C𝓭, ISQDimensionBase.charge, single_exponent]
 
 end Dimension

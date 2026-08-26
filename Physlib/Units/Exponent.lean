@@ -7,6 +7,8 @@ module
 
 public import Mathlib.Algebra.Field.TransferInstance
 public import Mathlib.Algebra.Field.Rat
+public import Mathlib.Algebra.Order.Ring.InjSurj
+public import Mathlib.Algebra.Order.Ring.Rat
 /-!
 
 # Reducible rational arithmetic for dimension exponents
@@ -41,6 +43,11 @@ structure Exponent where
   /-- The rational number represented by the exponent. -/
   toRat : ℚ
 deriving DecidableEq
+
+attribute [coe] Exponent.toRat
+
+instance : Repr Exponent where
+  reprPrec x := reprPrec x.toRat
 
 namespace Exponent
 
@@ -192,17 +199,68 @@ def ringEquivRat : Exponent ≃+* ℚ where
   map_mul' := mul_equiv
 
 /-- Regard a dimension exponent as a rational number. -/
-instance : Coe Exponent ℚ := ⟨ringEquivRat⟩
+instance : Coe Exponent ℚ := ⟨Exponent.toRat⟩
+
+@[simp, norm_cast]
+lemma coe_inj {a b : Exponent} : (a : ℚ) = b ↔ a = b :=
+  ringEquivRat.injective.eq_iff
+
+@[simp, norm_cast]
+lemma coe_zero : ((0 : Exponent) : ℚ) = 0 := map_zero ringEquivRat
+
+@[simp, norm_cast]
+lemma coe_one : ((1 : Exponent) : ℚ) = 1 := map_one ringEquivRat
+
+@[simp, norm_cast]
+lemma coe_ofNat (n : ℕ) [n.AtLeastTwo] : ((ofNat(n) : Exponent) : ℚ) = ofNat(n) :=
+  map_ofNat ringEquivRat n
+
+@[simp, norm_cast]
+lemma coe_add (a b : Exponent) : ((a + b : Exponent) : ℚ) = a + b :=
+  map_add ringEquivRat a b
+
+@[simp, norm_cast]
+lemma coe_sub (a b : Exponent) : ((a - b : Exponent) : ℚ) = a - b :=
+  map_sub ringEquivRat a b
+
+@[simp, norm_cast]
+lemma coe_neg (a : Exponent) : ((-a : Exponent) : ℚ) = -a :=
+  map_neg ringEquivRat a
+
+@[simp, norm_cast]
+lemma coe_mul (a b : Exponent) : ((a * b : Exponent) : ℚ) = a * b :=
+  map_mul ringEquivRat a b
+
+@[simp, norm_cast]
+lemma coe_inv (a : Exponent) : ((a⁻¹ : Exponent) : ℚ) = (a : ℚ)⁻¹ :=
+  inv_equiv a
+
+@[simp, norm_cast]
+lemma coe_div (a b : Exponent) : ((a / b : Exponent) : ℚ) = (a : ℚ) / b :=
+  div_equiv a b
+
+instance : LinearOrder Exponent := equivRat.linearOrder
+
+@[simp, norm_cast]
+lemma coe_le_coe {a b : Exponent} : (a : ℚ) ≤ b ↔ a ≤ b := Iff.rfl
+
+@[simp, norm_cast]
+lemma coe_lt_coe {a b : Exponent} : (a : ℚ) < b ↔ a < b := Iff.rfl
+
+instance : IsStrictOrderedRing Exponent :=
+  Function.Injective.isStrictOrderedRing ringEquivRat
+    (map_zero ringEquivRat) (map_one ringEquivRat) (map_add ringEquivRat) (map_mul ringEquivRat)
+    coe_le_coe coe_lt_coe
 
 instance : CharZero Exponent where
   cast_injective _ _ equality := Nat.cast_injective <| congrArg equivRat equality
 
--- Test induced field compatibility with custom operations
-example : add = instField.add := rfl
-example : sub = instField.sub := rfl
-example : inv = instField.inv := rfl
-example : mul = instField.mul := rfl
-example : div = instField.div := rfl
+-- These regressions pin the field structure to the reducible operations above.
+lemma add_eq_instField_add : add = instField.add := rfl
+lemma sub_eq_instField_sub : sub = instField.sub := rfl
+lemma inv_eq_instField_inv : inv = instField.inv := rfl
+lemma mul_eq_instField_mul : mul = instField.mul := rfl
+lemma div_eq_instField_div : div = instField.div := rfl
 
 /-!
 
@@ -210,15 +268,16 @@ example : div = instField.div := rfl
 
 -/
 
-example :
+lemma tuple_arithmetic_defeq :
     let Length : Exponent × Exponent := (1, 0)
     let Time : Exponent × Exponent := (0, 1)
     let Speed := Length - Time
     Length = Time + Speed := rfl
 
-example : ((2 / 3 + 5 / 7) * (11 / 13 - 1 / 2) : Exponent) = 87 / 182 := rfl
+lemma rational_arithmetic_defeq :
+    ((2 / 3 + 5 / 7) * (11 / 13 - 1 / 2) : Exponent) = 87 / 182 := rfl
 
-example : ((-3 / 4 : Exponent)⁻¹ + 5 / 6) = -1 / 2 := rfl
+lemma inverse_arithmetic_defeq : ((-3 / 4 : Exponent)⁻¹ + 5 / 6) = -1 / 2 := rfl
 
 end Dimension.Exponent
 
