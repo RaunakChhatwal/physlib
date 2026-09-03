@@ -8,7 +8,7 @@ module
 public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Angle
 public import Mathlib.Data.Fin.VecNotation
 public import Mathlib.Geometry.Manifold.Instances.Quotient
-public import Physlib.ClassicalMechanics.ParticleMechanics.System
+public import Physlib.ClassicalMechanics.PointParticle.Defs
 /-!
 # The simple pendulum
 
@@ -20,7 +20,7 @@ the bob stays a fixed distance from the pivot, and the pivot exerts a central fo
 The pivot is also a particle, rather than a fixed point of space. An external support force keeps it
 at the frame origin, and gravity acts on both particles. Representing these forces explicitly makes
 the environment assumed by the textbook model visible while keeping the pendulum a
-`ParticleMechanics.System` that satisfies Newton's laws.
+`PointParticle.System` that satisfies Newton's laws.
 
 The model can be described in two directions. `Params` supplies masses, length, gravity, and an
 initial angular state from which a pendulum can be built. `Specs system` states that an existing
@@ -46,8 +46,8 @@ the objects already in the system, then state the conditions that make them a si
 
 The vector is constant in time and points along the frame's negative second axis, so a pendulum
 specification separately requires the frame basis to be orthonormal. -/
-def gravity {system : ParticleMechanics.System 2} (particle : system.Particle) (g : ℝ+) :
-    system.frame.Force where
+def gravity {system : PointParticle.System 2} (particle : system.Particle) (g : ℝ+) :
+    system.frame.Force system.Particle where
   value _ := .mk ![0, -particle.mass * g]
   target := particle
 
@@ -72,9 +72,7 @@ pendulum.
 This structure adds no physical objects to `system`. It identifies two existing particles and
 existing forces as the pivot, bob, tension, and support, then states that these are all the relevant
 objects and that they satisfy the defining relations of a simple pendulum. -/
-structure Specs (system : ParticleMechanics.System 2) where
-  /-- The frame coordinates preserve Euclidean lengths and perpendicular directions. -/
-  orthonormal : system.frame.Orthonormal
+structure Specs (system : PointParticle.System 2) where
   /-- The system particle that serves as the pivot. -/
   pivot : system.Particle
   /-- The pivot's whole trajectory is the frame origin. -/
@@ -88,22 +86,24 @@ structure Specs (system : ParticleMechanics.System 2) where
   /-- The pivot and bob are the only particles in the system. -/
   no_other_particles : Set.univ = {pivot, bob}
   /-- The internal force that represents the pivot's pull on the bob. -/
-  tension : system.frame.InternalForce
+  tension : system.InternalForce
   /-- The tension force acts on the bob. -/
   tension_targets_bob : tension.target = bob
   /-- Tension has no tangential component: it lies along the pivot-bob line. -/
   tension_central : tension.Central
   /-- The only internal interaction is tension and its equal-and-opposite reaction on the pivot. -/
-  no_other_internal_forces : system.internalForces = {tension, tension.reverse}
+  no_other_internal_forces : system.internalForces = {↑tension, ↑tension.reverse}
   /-- The external force that keeps the pivot on its prescribed trajectory. -/
-  pivotSupportForce : system.frame.Force
+  pivotSupportForce : system.Force
   /-- The support force acts on the pivot. -/
   support_targets_pivot : pivotSupportForce.target = pivot
   /-- The positive gravitational acceleration shared by both particles. -/
   g : ℝ+
   /-- The environment contributes exactly gravity on each mass and support at the pivot. -/
   no_other_external_forces :
-    system.externalForces = {gravity bob g, gravity pivot g, pivotSupportForce}
+    system.externalForces = {gravity bob g, gravity pivot g, ↑pivotSupportForce}
+  /-- The frame coordinates preserve Euclidean lengths and perpendicular directions. -/
+  orthonormal : system.frame.Orthonormal
 
 end Pendulum
 
@@ -112,7 +112,7 @@ end Pendulum
 -/
 
 /-- A Newtonian particle system together with evidence that it is a simple pendulum. -/
-structure Pendulum extends ParticleMechanics.System 2, Pendulum.Specs toSystem
+structure Pendulum extends PointParticle.System 2, Pendulum.Specs toSystem
 
 namespace Pendulum
 

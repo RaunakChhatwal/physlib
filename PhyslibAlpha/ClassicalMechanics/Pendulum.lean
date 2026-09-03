@@ -46,7 +46,7 @@ selects a pendulum with the requested physical parameters and initial state.
 -/
 
 /-- A fixed particle system admits no pendulum specification distinct from `self`. -/
-lemma Specs.uniqueness (system : ParticleMechanics.System 2) (self : Specs system) :
+lemma Specs.uniqueness (system : PointParticle.System 2) (self : Specs system) :
     Set.univ = {self} :=
   Internal.specs_uniqueness system self
 

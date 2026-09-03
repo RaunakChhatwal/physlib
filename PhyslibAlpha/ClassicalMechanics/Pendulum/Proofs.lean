@@ -503,22 +503,36 @@ lemma paramsPivot_ne_paramsBob (params : Params) :
   exact paramsPivot_pos_ne_paramsBob_pos params
     (congrArg ReferenceFrame.Particle.pos particles_eq)
 
-def paramsGravity (params : Params) (particle : paramsFrame.Particle) :
-    paramsFrame.Force where
-  value _ := .mk ![0, -particle.mass * params.g]
+def paramsParticles (params : Params) : Multiset paramsFrame.Particle :=
+  {paramsPivot params, paramsBob params}
+
+def paramsPivotParticle (params : Params) : paramsParticles params :=
+  ⟨paramsPivot params, ⟨0, Multiset.count_pos.mpr (by simp [paramsParticles])⟩⟩
+
+def paramsBobParticle (params : Params) : paramsParticles params :=
+  ⟨paramsBob params, ⟨0, Multiset.count_pos.mpr (by simp [paramsParticles])⟩⟩
+
+lemma paramsPivotParticle_ne_paramsBobParticle (params : Params) :
+    paramsPivotParticle params ≠ paramsBobParticle params := by
+  intro particles_eq
+  exact paramsPivot_ne_paramsBob params (congrArg Sigma.fst particles_eq)
+
+def paramsGravity (params : Params) (particle : paramsParticles params) :
+    paramsFrame.Force (paramsParticles params) where
+  value _ := .mk ![0, -particle.1.mass * params.g]
   target := particle
 
-def paramsTension (params : Params) : paramsFrame.InternalForce where
+def paramsTension (params : Params) : paramsFrame.InternalForce (paramsParticles params) where
   value t := (-params.bobMass.val *
     (angularVelocity params t.val ^ 2 + params.g / params.L * Real.cos (angle params t.val))) •
       bobPosition params t.val
-  target := paramsBob params
-  source := paramsPivot params
-  source_ne_target := paramsPivot_ne_paramsBob params
+  target := paramsBobParticle params
+  source := paramsPivotParticle params
+  source_ne_target := paramsPivotParticle_ne_paramsBobParticle params
 
-def paramsSupportForce (params : Params) : paramsFrame.Force where
-  value t := paramsTension params t - paramsGravity params (paramsPivot params) t
-  target := paramsPivot params
+def paramsSupportForce (params : Params) : paramsFrame.Force (paramsParticles params) where
+  value t := paramsTension params t - paramsGravity params (paramsPivotParticle params) t
+  target := paramsPivotParticle params
 
 lemma paramsBob_acc (params : Params) :
     (paramsBob params).acc = fun t ↦ bobAcceleration params t.val := by
@@ -536,17 +550,15 @@ lemma paramsPivot_acc (params : Params) :
   exact Time.deriv_const (t := t) 0
 
 lemma paramsTension_central (params : Params) :
-    (paramsTension params).Central := by
+    ∀ t, ∃ c : ℝ, paramsTension params t = c •
+      ((paramsTension params).target.1.pos t - (paramsTension params).source.1.pos t) := by
   intro t
-  refine ⟨params.bobMass.val *
+  refine ⟨-params.bobMass.val *
     (angularVelocity params t.val ^ 2 + params.g / params.L * Real.cos (angle params t.val)), ?_⟩
-  apply vector_eq_of_components
-  intro i
-  refine Fin.cases ?_ (fun j ↦ Fin.cases ?_ (fun j ↦ Fin.elim0 j) j) i <;>
-    simp [paramsTension, paramsPivot, paramsBob, bobPosition]
+  simp [paramsTension, paramsPivotParticle, paramsPivot, paramsBobParticle, paramsBob]
 
 lemma paramsBob_newton_second_law (params : Params) (t : Time) :
-    paramsTension params t + paramsGravity params (paramsBob params) t =
+    paramsTension params t + paramsGravity params (paramsBobParticle params) t =
       params.bobMass • bobAcceleration params t.val := by
   apply vector_eq_of_components
   intro i
@@ -560,156 +572,151 @@ lemma paramsBob_newton_second_law (params : Params) (t : Time) :
               Real.sin (angle params t.val)))
     field_simp [ne_of_gt params.L.property]
     ring
-  · simp [paramsTension, paramsGravity, paramsBob, bobPosition, bobAcceleration]
+  · simp [paramsTension, paramsGravity, paramsBobParticle, paramsBob, bobPosition,
+      bobAcceleration]
     field_simp [ne_of_gt params.L.property]
     linear_combination params.bobMass.val * params.g.val *
       Real.sin_sq_add_cos_sq (angle params t.val)
 
-lemma paramsPivot_newton_second_law (params : Params) (t : ℝ) :
-    (paramsTension params).reverse t + paramsGravity params (paramsPivot params) t +
+lemma paramsPivot_newton_second_law (params : Params) (t : Time) :
+    (paramsTension params).reverse t + paramsGravity params (paramsPivotParticle params) t +
         paramsSupportForce params t = 0 := by
-  change -(paramsTension params t) + paramsGravity params (paramsPivot params) t +
-      (paramsTension params t - paramsGravity params (paramsPivot params) t) = 0
+  change -(paramsTension params t) + paramsGravity params (paramsPivotParticle params) t +
+      (paramsTension params t - paramsGravity params (paramsPivotParticle params) t) = 0
   abel
 
-lemma params_multiset_sum_eq_fintype_sum
-    {α M : Type*} [DecidableEq α] [AddCommMonoid M]
-    (s : Multiset α) (f : α → M) :
-    (s.map f).sum = ∑ x : s, f x.1 := by
-  change (s.map f).sum =
-    (((Finset.univ : Finset s).val.map fun x : s ↦ f x.1).sum)
-  rw [Multiset.map_univ]
+lemma filtered_subtype_sum_eq_multiset_sum
+    {α β : Type*} [AddCommMonoid β]
+    (elements : Multiset α) (predicate : α → Prop) [DecidablePred predicate]
+    (value : α → β) :
+    (∑ element : elements with predicate element.1, value element.1) =
+      ((elements.filter predicate).map value).sum := by
+  rw [Finset.sum_filter]
+  have sum_map (f : α → β) :
+      (∑ element : elements, f element) = (elements.map f).sum := by
+    rw [Multiset.sum_eq_sum_coe]
+    apply Fintype.sum_equiv (elements.mapEquiv f)
+    intro element
+    rw [Multiset.mapEquiv_apply]
+  calc
+    _ = (elements.map fun element ↦ if predicate element then value element else 0).sum :=
+      sum_map _
+    _ = _ := by
+      clear sum_map
+      induction elements using Multiset.induction_on with
+      | empty => simp
+      | cons element elements inductionHypothesis =>
+          by_cases satisfies : predicate element <;>
+            simp [satisfies, inductionHypothesis]
 
 lemma internalForce_reverse_reverse {frame : ReferenceFrame 2}
-    (force : frame.InternalForce) : force.reverse.reverse = force := by
+    {Object : Type} (force : frame.InternalForce Object) : force.reverse.reverse = force := by
   rcases force with ⟨⟨value, target⟩, source, source_ne_target⟩
   simp [ReferenceFrame.InternalForce.reverse]
 
-lemma paramsBob_netForce (params : Params) (t : ℝ) :
-    (paramsBob params).netForce
-      {paramsTension params, (paramsTension params).reverse}
-      {paramsGravity params (paramsBob params), paramsGravity params (paramsPivot params),
-        paramsSupportForce params} t =
-      paramsTension params t + paramsGravity params (paramsBob params) t := by
-  have internal_filter :
-      ({paramsTension params, (paramsTension params).reverse} :
-        Multiset paramsFrame.InternalForce).filter
-          (fun force ↦ force.target = paramsBob params) = {paramsTension params} := by
-    change Multiset.filter (fun force : paramsFrame.InternalForce ↦
-      force.target = paramsBob params)
-      (paramsTension params ::ₘ {(paramsTension params).reverse}) = {paramsTension params}
-    simp only [← Multiset.cons_zero]
-    rw [Multiset.filter_cons_of_pos
-      (p := fun force : paramsFrame.InternalForce ↦ force.target = paramsBob params) _ rfl,
-      Multiset.filter_cons_of_neg
-        (p := fun force : paramsFrame.InternalForce ↦ force.target = paramsBob params) _
-        (paramsPivot_ne_paramsBob params)]
-    simp
-  have external_filter :
-      ({paramsGravity params (paramsBob params), paramsGravity params (paramsPivot params),
-        paramsSupportForce params} : Multiset paramsFrame.Force).filter
-          (fun force ↦ force.target = paramsBob params) =
-        {paramsGravity params (paramsBob params)} := by
-    change Multiset.filter (fun force : paramsFrame.Force ↦
-      force.target = paramsBob params)
-      (paramsGravity params (paramsBob params) ::ₘ
-        paramsGravity params (paramsPivot params) ::ₘ {paramsSupportForce params}) =
-          {paramsGravity params (paramsBob params)}
-    simp only [← Multiset.cons_zero]
-    rw [Multiset.filter_cons_of_pos
-      (p := fun force : paramsFrame.Force ↦ force.target = paramsBob params) _ rfl,
-      Multiset.filter_cons_of_neg
-        (p := fun force : paramsFrame.Force ↦ force.target = paramsBob params) _
-        (paramsPivot_ne_paramsBob params),
-      Multiset.filter_cons_of_neg
-        (p := fun force : paramsFrame.Force ↦ force.target = paramsBob params) _
-        (paramsPivot_ne_paramsBob params)]
-    simp
-  simp only [ReferenceFrame.Particle.netForce,
-    ReferenceFrame.Particle.netExternalForce]
-  rw [internal_filter, external_filter,
-    ← params_multiset_sum_eq_fintype_sum {paramsTension params} (fun force ↦ force t),
-    ← params_multiset_sum_eq_fintype_sum {paramsGravity params (paramsBob params)}
-      (fun force ↦ force t)]
-  simp
+lemma netForce_eq_multiset_sum
+    {frame : ReferenceFrame 2}
+    {particles : Multiset frame.Particle}
+    (particle : particles)
+    (internalForces : Multiset (frame.InternalForce particles))
+    (externalForces : Multiset (frame.Force particles)) (t : Time) :
+    ReferenceFrame.netForce particle internalForces externalForces t =
+      ((((internalForces.map ReferenceFrame.InternalForce.toForce + externalForces).filter
+        fun force ↦ force.target = particle).map fun force ↦ force t).sum) := by
+  exact filtered_subtype_sum_eq_multiset_sum
+    (predicate := fun force : frame.Force particles ↦ force.target = particle)
+    (value := fun force ↦ force t) _
 
-lemma paramsPivot_netForce (params : Params) (t : ℝ) :
-    (paramsPivot params).netForce
+lemma paramsBob_netForce (params : Params) (t : Time) :
+    ReferenceFrame.netForce (paramsBobParticle params)
       {paramsTension params, (paramsTension params).reverse}
-      {paramsGravity params (paramsBob params), paramsGravity params (paramsPivot params),
+      {paramsGravity params (paramsBobParticle params),
+        paramsGravity params (paramsPivotParticle params),
         paramsSupportForce params} t =
-      (paramsTension params).reverse t + paramsGravity params (paramsPivot params) t +
-        paramsSupportForce params t := by
-  have internal_filter :
-      ({paramsTension params, (paramsTension params).reverse} :
-        Multiset paramsFrame.InternalForce).filter
-          (fun force ↦ force.target = paramsPivot params) =
-        {(paramsTension params).reverse} := by
-    change Multiset.filter (fun force : paramsFrame.InternalForce ↦
-      force.target = paramsPivot params)
-      (paramsTension params ::ₘ {(paramsTension params).reverse}) =
-        {(paramsTension params).reverse}
-    simp only [← Multiset.cons_zero]
-    rw [Multiset.filter_cons_of_neg
-      (p := fun force : paramsFrame.InternalForce ↦ force.target = paramsPivot params) _
-        (paramsPivot_ne_paramsBob params).symm,
-      Multiset.filter_cons_of_pos
-      (p := fun force : paramsFrame.InternalForce ↦ force.target = paramsPivot params) _ rfl]
-    simp
-  have external_filter :
-      ({paramsGravity params (paramsBob params), paramsGravity params (paramsPivot params),
-        paramsSupportForce params} : Multiset paramsFrame.Force).filter
-          (fun force ↦ force.target = paramsPivot params) =
-        {paramsGravity params (paramsPivot params), paramsSupportForce params} := by
-    change Multiset.filter (fun force : paramsFrame.Force ↦
-      force.target = paramsPivot params)
-      (paramsGravity params (paramsBob params) ::ₘ
-        paramsGravity params (paramsPivot params) ::ₘ {paramsSupportForce params}) =
-          {paramsGravity params (paramsPivot params), paramsSupportForce params}
-    simp only [← Multiset.cons_zero]
-    rw [Multiset.filter_cons_of_neg
-      (p := fun force : paramsFrame.Force ↦ force.target = paramsPivot params) _
-        (paramsPivot_ne_paramsBob params).symm,
-      Multiset.filter_cons_of_pos
-      (p := fun force : paramsFrame.Force ↦ force.target = paramsPivot params) _ rfl,
-      Multiset.filter_cons_of_pos
-      (p := fun force : paramsFrame.Force ↦ force.target = paramsPivot params) _ rfl]
-    simp
-  simp only [ReferenceFrame.Particle.netForce,
-    ReferenceFrame.Particle.netExternalForce]
-  rw [internal_filter, external_filter,
-    ← params_multiset_sum_eq_fintype_sum {(paramsTension params).reverse}
-      (fun force ↦ force t),
-    ← params_multiset_sum_eq_fintype_sum
-      {paramsGravity params (paramsPivot params), paramsSupportForce params}
-      (fun force ↦ force t)]
-  simp
+      paramsTension params t + paramsGravity params (paramsBobParticle params) t := by
+  rw [netForce_eq_multiset_sum]
+  simp [Multiset.filter_singleton, paramsTension, paramsGravity, paramsSupportForce,
+    ReferenceFrame.InternalForce.reverse, paramsPivotParticle_ne_paramsBobParticle]
   abel
 
-def paramsSystem (params : Params) : ParticleMechanics.System 2 where
+lemma paramsPivot_netForce (params : Params) (t : Time) :
+    ReferenceFrame.netForce (paramsPivotParticle params)
+      {paramsTension params, (paramsTension params).reverse}
+      {paramsGravity params (paramsBobParticle params),
+        paramsGravity params (paramsPivotParticle params),
+        paramsSupportForce params} t =
+      (paramsTension params).reverse t +
+        paramsGravity params (paramsPivotParticle params) t +
+        paramsSupportForce params t := by
+  rw [netForce_eq_multiset_sum]
+  simp [Multiset.filter_singleton, paramsTension, paramsGravity, paramsSupportForce,
+    ReferenceFrame.InternalForce.reverse,
+    (paramsPivotParticle_ne_paramsBobParticle params).symm]
+  abel
+
+lemma paramsParticle_eq_pivot_or_bob (params : Params) (particle : paramsParticles params) :
+    particle = paramsPivotParticle params ∨ particle = paramsBobParticle params := by
+  rcases particle with ⟨particle, index⟩
+  have particle_mem : particle ∈ paramsParticles params :=
+    Multiset.count_pos.mp (Nat.zero_lt_of_lt index.isLt)
+  simp [paramsParticles] at particle_mem
+  rcases particle_mem with particle_eq | particle_eq
+  · subst particle
+    left
+    congr 1
+    apply Fin.ext
+    have index_lt := index.isLt
+    simp [paramsParticles, paramsPivot_ne_paramsBob] at index_lt
+    omega
+  · subst particle
+    right
+    congr 1
+    apply Fin.ext
+    have index_lt := index.isLt
+    simp [paramsParticles, paramsPivot_ne_paramsBob] at index_lt
+    omega
+
+def paramsSystem (params : Params) : PointParticle.System 2 where
   frame := paramsFrame
-  particles := {paramsPivot params, paramsBob params}
+  particles := paramsParticles params
   internalForces := {paramsTension params, (paramsTension params).reverse}
-  externalForces := {paramsGravity params (paramsBob params),
-    paramsGravity params (paramsPivot params), paramsSupportForce params}
-  forces_involve_self := by
-    intro particle particle_mem
-    simpa [ReferenceFrame.particlesInvolved, paramsTension, paramsGravity,
-      paramsSupportForce, ReferenceFrame.InternalForce.reverse, or_comm] using particle_mem
+  externalForces := {paramsGravity params (paramsBobParticle params),
+    paramsGravity params (paramsPivotParticle params), paramsSupportForce params}
   newton_second_law := by
-    intro particle particle_mem t
-    simp only [Finset.mem_insert, Finset.mem_singleton] at particle_mem
-    rcases particle_mem with rfl | rfl
-    · rw [paramsPivot_netForce, paramsPivot_newton_second_law, paramsPivot_acc]
+    intro particle
+    funext t
+    rcases paramsParticle_eq_pivot_or_bob params particle with rfl | rfl
+    · rw [paramsPivot_netForce, paramsPivot_newton_second_law]
+      change (0 : paramsFrame.Vector) =
+        params.pivotMass.val • (paramsPivot params).acc t
+      rw [paramsPivot_acc]
       change (0 : paramsFrame.Vector) = params.pivotMass.val • (0 : paramsFrame.Vector)
       simp
-    · rw [paramsBob_netForce, paramsBob_newton_second_law, paramsBob_acc]
-      rfl
+    · rw [paramsBob_netForce, paramsBob_newton_second_law]
+      change params.bobMass.val • bobAcceleration params t.val =
+        params.bobMass.val • (paramsBob params).acc t
+      rw [paramsBob_acc]
   newton_third_law := by
     change (paramsTension params).reverse ::ₘ {(paramsTension params).reverse.reverse} =
       {paramsTension params, (paramsTension params).reverse}
     rw [internalForce_reverse_reverse]
     exact Multiset.cons_swap _ _ _
+
+def paramsTensionOccurrence (params : Params) : (paramsSystem params).InternalForce :=
+  ⟨paramsTension params,
+    ⟨0, by
+      change 0 < Multiset.count (paramsTension params)
+        {paramsTension params, (paramsTension params).reverse}
+      simp⟩⟩
+
+def paramsSupportForceOccurrence (params : Params) : (paramsSystem params).Force :=
+  Sum.inr ⟨paramsSupportForce params,
+    ⟨0, by
+      change 0 < Multiset.count (paramsSupportForce params)
+        {paramsGravity params (paramsBobParticle params),
+          paramsGravity params (paramsPivotParticle params), paramsSupportForce params}
+      apply Multiset.count_pos.mpr
+      simp⟩⟩
 
 lemma angle_chart_symm (θ : Real.Angle) :
     ⇑(chartAt ℝ θ).symm = ((↑) : ℝ → Real.Angle) := by
@@ -792,46 +799,37 @@ lemma mfderiv_angle_arg
 def paramsPendulum (params : Params) : Pendulum where
   toSystem := paramsSystem params
   orthonormal := paramsFrame_orthonormal
-  pivot := ⟨paramsPivot params, by
-    change paramsPivot params ∈ {paramsPivot params, paramsBob params}
-    exact Finset.mem_insert_self _ _⟩
+  pivot := paramsPivotParticle params
   pivot_at_origin := rfl
   L := params.L
-  bob := ⟨paramsBob params, by
-    change paramsBob params ∈ {paramsPivot params, paramsBob params}
-    exact Finset.mem_insert_of_mem (Finset.mem_singleton_self _)⟩
+  bob := paramsBobParticle params
   length_constant := by
     intro t
-    change ‖bobPosition params t‖ = params.L.val
+    change ‖bobPosition params t.val‖ = params.L.val
     rw [vector_norm_l2_if_orthonormal paramsFrame_orthonormal]
     simp only [bobPosition, Fin.sum_univ_two, Matrix.cons_val_zero,
       Matrix.cons_val_one]
-    have trig := Real.sin_sq_add_cos_sq (angle params t)
+    have trig := Real.sin_sq_add_cos_sq (angle params t.val)
     have L_pos := params.L.property
-    rw [show (params.L.val * Real.sin (angle params t)) ^ 2 +
-        (-params.L.val * Real.cos (angle params t)) ^ 2 = params.L.val ^ 2 by
+    rw [show (params.L.val * Real.sin (angle params t.val)) ^ 2 +
+        (-params.L.val * Real.cos (angle params t.val)) ^ 2 = params.L.val ^ 2 by
       nlinarith]
     rw [Real.sqrt_sq_eq_abs, abs_of_pos L_pos]
   no_other_particles := by
     ext particle
-    simp only [Set.mem_univ, Set.mem_insert_iff, Set.mem_singleton_iff, true_iff]
-    rcases particle with ⟨particle, particle_mem⟩
-    rcases Finset.mem_insert.mp particle_mem with particle_eq | particle_mem
-    · left
-      cases particle_eq
-      rfl
-    · right
-      have particle_eq := Finset.mem_singleton.mp particle_mem
-      cases particle_eq
-      rfl
-  tension := paramsTension params
+    simp only [Set.mem_univ, true_iff]
+    exact paramsParticle_eq_pivot_or_bob params particle
+  tension := paramsTensionOccurrence params
   tension_targets_bob := rfl
   tension_central := paramsTension_central params
   no_other_internal_forces := rfl
-  pivotSupportForce := paramsSupportForce params
+  pivotSupportForce := paramsSupportForceOccurrence params
   support_targets_pivot := rfl
   g := params.g
-  no_other_external_forces := rfl
+  no_other_external_forces := by
+    simp only [paramsSystem, paramsGravity, gravity, PointParticle.System.Particle.mass,
+      paramsSupportForceOccurrence]
+    rfl
 
 lemma paramsPendulum_θ (params : Params) (t : ℝ) :
     (paramsPendulum params).θ t = (angle params t : Real.Angle) := by
@@ -849,10 +847,12 @@ lemma paramsPendulum_θ (params : Params) (t : ℝ) :
         Complex.I_re, Complex.I_im, Complex.ofReal_im, Real.Angle.cos_coe,
         Real.Angle.sin_coe]
       ring
-  change (Complex.arg z : Real.Angle) = _
+  simp only [Pendulum.θ, paramsPendulum, PointParticle.System.Particle.pos]
+  change (Complex.arg z : Real.Angle) = (angle params t : Real.Angle)
   rw [z_eq]
   exact Complex.arg_mul_cos_add_sin_mul_I_coe_angle params.L.property _
 
+set_option backward.isDefEq.respectTransparency false in
 lemma paramsPendulum_ω (params : Params) (t : ℝ) :
     (paramsPendulum params).ω t = angularVelocity params t := by
   let z := fun s ↦ Complex.equivRealProdCLM.symm
@@ -898,8 +898,10 @@ lemma paramsPendulum_ω (params : Params) (t : ℝ) :
   have theta_eq : (paramsPendulum params).θ =
       fun s : Time ↦ (Complex.arg (z s.val) : Real.Angle) := by
     funext s
+    simp only [Pendulum.θ, paramsPendulum, PointParticle.System.Particle.pos]
     change (Complex.arg ⟨-(-params.L * Real.cos (angle params s.val)),
-      params.L * Real.sin (angle params s.val)⟩ : Real.Angle) = _
+      params.L * Real.sin (angle params s.val)⟩ : Real.Angle) =
+        (Complex.arg (z s.val) : Real.Angle)
     have complex_eq : (⟨-(-params.L * Real.cos (angle params s.val)),
         params.L * Real.sin (angle params s.val)⟩ : ℂ) = z s.val := by
       rw [z_apply]
@@ -907,22 +909,29 @@ lemma paramsPendulum_ω (params : Params) (t : ℝ) :
     rw [complex_eq]
   rw [Pendulum.ω, theta_eq, Time.manifoldDeriv_eq]
   have real_derivative := hasMFDerivAt_angle_arg z_has_deriv z_ne_zero
-  have time_derivative := real_derivative.comp (t : Time)
-    Time.toRealCLM.hasFDerivAt.hasMFDerivAt
+  have time_derivative : HasMFDerivAt 𝓘(ℝ, Time) 𝓘(ℝ)
+      (fun s : Time ↦ (Complex.arg (z s.val) : Real.Angle)) (t : Time)
+      ((ContinuousLinearMap.toSpanSingleton ℝ (z' / z t).im).comp Time.toRealCLM) := by
+    convert real_derivative.comp (t : Time)
+      Time.toRealCLM.hasFDerivAt.hasMFDerivAt using 1
+    all_goals rfl
   have mfderiv_eq := time_derivative.mfderiv
-  calc
-    mfderiv 𝓘(ℝ, Time) 𝓘(ℝ)
-        (fun s : Time ↦ (Complex.arg (z s.val) : Real.Angle)) (t : Time) (1 : Time) =
-        ((ContinuousLinearMap.toSpanSingleton ℝ (z' / z t).im).comp Time.toRealCLM)
-          (1 : Time) := congrArg (fun f ↦ f (1 : Time)) mfderiv_eq
-    _ = (z' / z t).im := by simp [Time.toRealCLM]
-    _ = angularVelocity params t := by
-      rw [z'_apply, z_apply t, Complex.div_im, Complex.normSq_apply]
-      dsimp
-      field_simp [ne_of_gt params.L.property,
-        show Real.cos (angle params t) ^ 2 + Real.sin (angle params t) ^ 2 ≠ 0 by
-          nlinarith [Real.sin_sq_add_cos_sq (angle params t)]]
-      nlinarith [Real.sin_sq_add_cos_sq (angle params t)]
+  rw [mfderiv_eq]
+  have comp_apply_eq :
+      ((ContinuousLinearMap.toSpanSingleton ℝ (z' / z t).im).comp Time.toRealCLM)
+          (1 : Time) = (z' / z t).im := by
+    rw [ContinuousLinearMap.comp_apply, ContinuousLinearMap.toSpanSingleton_apply]
+    have one_eq : Time.toRealCLM (1 : Time) = (1 : ℝ) := by
+      change (1 : Time).val = (1 : ℝ)
+      rw [Time.one_val]
+    rw [one_eq, one_smul]
+  refine comp_apply_eq.trans ?_
+  rw [z'_apply, z_apply t, Complex.div_im, Complex.normSq_apply]
+  dsimp
+  field_simp [ne_of_gt params.L.property,
+    show Real.cos (angle params t) ^ 2 + Real.sin (angle params t) ^ 2 ≠ 0 by
+      nlinarith [Real.sin_sq_add_cos_sq (angle params t)]]
+  nlinarith [Real.sin_sq_add_cos_sq (angle params t)]
 
 lemma params_eq_of_fields (a b : Params)
     (pivotMass_eq : a.pivotMass = b.pivotMass)
@@ -938,7 +947,13 @@ lemma params_eq_of_fields (a b : Params)
 
 lemma params_paramsPendulum (params : Params) :
     (paramsPendulum params).params = params := by
-  apply params_eq_of_fields <;> try rfl
+  apply params_eq_of_fields
+  · simp [Pendulum.params, paramsPendulum, PointParticle.System.Particle.mass,
+      paramsPivotParticle, paramsPivot]
+  · simp [Pendulum.params, paramsPendulum, PointParticle.System.Particle.mass,
+      paramsBobParticle, paramsBob]
+  · simp [Pendulum.params, paramsPendulum]
+  · simp [Pendulum.params, paramsPendulum]
   · change (paramsPendulum params).θ 0 = params.θ0
     rw [paramsPendulum_θ]
     have angle_zero := congrArg Prod.fst (phase_zero params)
@@ -960,7 +975,7 @@ noncomputable def make (params : Params) : Pendulum :=
 lemma make_params (params : Params) : (make params).params = params :=
   Classical.choose_spec (params_surjective params)
 
-def componentCLM {system : ParticleMechanics.System 2} (i : Fin 2) :
+def componentCLM {system : PointParticle.System 2} (i : Fin 2) :
     system.frame.Vector →L[ℝ] ℝ := by
   exact LinearMap.toContinuousLinearMap
     { toFun := fun v ↦ v.components i
@@ -968,7 +983,7 @@ def componentCLM {system : ParticleMechanics.System 2} (i : Fin 2) :
       map_smul' := fun _ _ ↦ rfl }
 
 @[simp]
-lemma componentCLM_apply {system : ParticleMechanics.System 2}
+lemma componentCLM_apply {system : PointParticle.System 2}
     (i : Fin 2) (v : system.frame.Vector) :
     componentCLM i v = v.components i :=
   rfl
@@ -1004,23 +1019,24 @@ lemma multiset_sum_eq_fintype_sum
     (((Finset.univ : Finset s).val.map fun x : s ↦ f x.1).sum)
   rw [Multiset.map_univ]
 
+set_option backward.isDefEq.respectTransparency false in
 lemma angular_velocity_eq (self : Pendulum) (t : Time) :
     self.ω t =
       ((self.bob.pos t).components 0 * (self.bob.vel t).components 1 -
         (self.bob.pos t).components 1 * (self.bob.vel t).components 0) / self.L ^ 2 := by
   let τ := Time.toRealCLE t
-  let x := fun s : ℝ ↦ (self.bob.pos (Time.toRealCLE.symm s)).components 0
-  let y := fun s : ℝ ↦ (self.bob.pos (Time.toRealCLE.symm s)).components 1
-  let vx := (self.bob.vel t).components 0
-  let vy := (self.bob.vel t).components 1
+  let x := fun s : ℝ ↦ (self.bob.1.pos (Time.toRealCLE.symm s)).components 0
+  let y := fun s : ℝ ↦ (self.bob.1.pos (Time.toRealCLE.symm s)).components 1
+  let vx := (self.bob.1.vel t).components 0
+  let vy := (self.bob.1.vel t).components 1
   let z := fun s ↦ Complex.equivRealProdCLM.symm (-y s, x s)
   let z' := Complex.equivRealProdCLM.symm (-vy, vx)
   have pos_has_deriv : HasDerivAt
-      (fun s : ℝ ↦ self.bob.pos (Time.toRealCLE.symm s)) (self.bob.vel t) τ := by
+      (fun s : ℝ ↦ self.bob.1.pos (Time.toRealCLE.symm s)) (self.bob.1.vel t) τ := by
     simpa only [τ, ContinuousLinearEquiv.symm_apply_apply,
       ReferenceFrame.Particle.vel] using
-      hasDerivAt_comp_toRealCLE_symm self.bob.pos τ
-        (self.bob.pos_twice_differentiable.1.differentiableAt)
+      hasDerivAt_comp_toRealCLE_symm self.bob.1.pos τ
+        ((self.bob.1.pos_twice_differentiable self.isInertial.out).1.differentiableAt)
   have x_has_deriv : HasDerivAt x vx τ := by
     convert (componentCLM (system := self.toSystem) 0).hasFDerivAt.comp_hasDerivAt τ
       pos_has_deriv using 1 <;> rfl
@@ -1040,21 +1056,23 @@ lemma angular_velocity_eq (self : Pendulum) (t : Time) :
     have y_eq_zero : y s = 0 := by
       have := congrArg Complex.re z_eq_zero
       simpa [z] using this
-    have pos_norm_eq_zero : ‖self.bob.pos (Time.toRealCLE.symm s)‖ = 0 := by
+    have pos_norm_eq_zero : ‖self.bob.1.pos (Time.toRealCLE.symm s)‖ = 0 := by
       rw [vector_norm_l2_if_orthonormal
         self.orthonormal]
       simp [Fin.sum_univ_two, x, y, x_eq_zero, y_eq_zero]
     have length_eq := self.length_constant (Time.toRealCLE.symm s)
+    change ‖self.bob.1.pos (Time.toRealCLE.symm s)‖ = self.L at length_eq
     rw [pos_norm_eq_zero] at length_eq
     nlinarith [self.L.property]
   have radius_eq : Real.sqrt (x τ ^ 2 + y τ ^ 2) = self.L := by
     calc
-      Real.sqrt (x τ ^ 2 + y τ ^ 2) = ‖self.bob.pos t‖ := by
+      Real.sqrt (x τ ^ 2 + y τ ^ 2) = ‖self.bob.1.pos t‖ := by
         rw [vector_norm_l2_if_orthonormal
           self.orthonormal]
         simp only [Fin.sum_univ_two]
         simp [x, y, τ]
-      _ = self.L := self.length_constant t
+      _ = self.L := by
+        simpa only [PointParticle.System.Particle.pos] using self.length_constant t
   have radius_sq : x τ ^ 2 + y τ ^ 2 = self.L ^ 2 := by
     have := congrArg (fun r : ℝ ↦ r ^ 2) radius_eq
     rw [Real.sq_sqrt (add_nonneg (sq_nonneg (x τ)) (sq_nonneg (y τ)))] at this
@@ -1074,43 +1092,54 @@ lemma angular_velocity_eq (self : Pendulum) (t : Time) :
     apply Complex.ext <;> rfl
   rw [Pendulum.ω, theta_eq, Time.manifoldDeriv_eq]
   have real_derivative := hasMFDerivAt_angle_arg z_has_deriv z_ne_zero
-  have time_derivative := real_derivative.comp t Time.toRealCLM.hasFDerivAt.hasMFDerivAt
+  have time_derivative : HasMFDerivAt 𝓘(ℝ, Time) 𝓘(ℝ)
+      (fun s : Time ↦ (Complex.arg (z (Time.toRealCLE s)) : Real.Angle)) t
+      ((ContinuousLinearMap.toSpanSingleton ℝ (z' / z τ).im).comp Time.toRealCLM) := by
+    convert real_derivative.comp t Time.toRealCLM.hasFDerivAt.hasMFDerivAt using 1
+    all_goals rfl
   have mfderiv_eq := time_derivative.mfderiv
+  rw [mfderiv_eq]
+  have comp_apply_eq :
+      ((ContinuousLinearMap.toSpanSingleton ℝ (z' / z τ).im).comp Time.toRealCLM)
+          (1 : Time) = (z' / z τ).im := by
+    rw [ContinuousLinearMap.comp_apply, ContinuousLinearMap.toSpanSingleton_apply]
+    have one_eq : Time.toRealCLM (1 : Time) = (1 : ℝ) := by
+      change (1 : Time).val = (1 : ℝ)
+      rw [Time.one_val]
+    rw [one_eq, one_smul]
+  refine comp_apply_eq.trans ?_
   calc
-    mfderiv 𝓘(ℝ, Time) 𝓘(ℝ)
-        (fun s : Time ↦ (Complex.arg (z (Time.toRealCLE s)) : Real.Angle)) t (1 : Time) =
-        ((ContinuousLinearMap.toSpanSingleton ℝ (z' / z τ).im).comp Time.toRealCLM)
-          (1 : Time) := congrArg (fun f ↦ f (1 : Time)) mfderiv_eq
-    _ = (z' / z τ).im := by simp [Time.toRealCLM]
-    _ = (x τ * vy - y τ * vx) / self.L ^ 2 := by
+    (z' / z τ).im = (x τ * vy - y τ * vx) / self.L ^ 2 := by
       rw [Complex.div_im, normSq_eq]
       change vx * -y τ / self.L ^ 2 - -vy * x τ / self.L ^ 2 = _
       ring
-    _ = _ := by simp [x, y, τ, vx, vy]
+    _ = _ := by
+      simp [x, y, τ, vx, vy, PointParticle.System.Particle.pos,
+        PointParticle.System.Particle.vel]
 
 lemma angular_acceleration_eq (self : Pendulum) (t : Time) :
     Time.deriv self.ω t =
       ((self.bob.pos t).components 0 * (self.bob.acc t).components 1 -
         (self.bob.pos t).components 1 * (self.bob.acc t).components 0) / self.L ^ 2 := by
   let τ := Time.toRealCLE t
-  let x := fun s : ℝ ↦ (self.bob.pos (Time.toRealCLE.symm s)).components 0
-  let y := fun s : ℝ ↦ (self.bob.pos (Time.toRealCLE.symm s)).components 1
-  let vx := fun s : ℝ ↦ (self.bob.vel (Time.toRealCLE.symm s)).components 0
-  let vy := fun s : ℝ ↦ (self.bob.vel (Time.toRealCLE.symm s)).components 1
-  let ax := (self.bob.acc t).components 0
-  let ay := (self.bob.acc t).components 1
+  let x := fun s : ℝ ↦ (self.bob.1.pos (Time.toRealCLE.symm s)).components 0
+  let y := fun s : ℝ ↦ (self.bob.1.pos (Time.toRealCLE.symm s)).components 1
+  let vx := fun s : ℝ ↦ (self.bob.1.vel (Time.toRealCLE.symm s)).components 0
+  let vy := fun s : ℝ ↦ (self.bob.1.vel (Time.toRealCLE.symm s)).components 1
+  let ax := (self.bob.1.acc t).components 0
+  let ay := (self.bob.1.acc t).components 1
   have pos_has_deriv : HasDerivAt
-      (fun s : ℝ ↦ self.bob.pos (Time.toRealCLE.symm s)) (self.bob.vel t) τ := by
+      (fun s : ℝ ↦ self.bob.1.pos (Time.toRealCLE.symm s)) (self.bob.1.vel t) τ := by
     simpa only [τ, ContinuousLinearEquiv.symm_apply_apply,
       ReferenceFrame.Particle.vel] using
-      hasDerivAt_comp_toRealCLE_symm self.bob.pos τ
-        self.bob.pos_twice_differentiable.1.differentiableAt
+      hasDerivAt_comp_toRealCLE_symm self.bob.1.pos τ
+        (self.bob.1.pos_twice_differentiable self.isInertial.out).1.differentiableAt
   have vel_has_deriv : HasDerivAt
-      (fun s : ℝ ↦ self.bob.vel (Time.toRealCLE.symm s)) (self.bob.acc t) τ := by
+      (fun s : ℝ ↦ self.bob.1.vel (Time.toRealCLE.symm s)) (self.bob.1.acc t) τ := by
     simpa only [τ, ContinuousLinearEquiv.symm_apply_apply,
       ReferenceFrame.Particle.acc] using
-      hasDerivAt_comp_toRealCLE_symm self.bob.vel τ
-        self.bob.pos_twice_differentiable.2.differentiableAt
+      hasDerivAt_comp_toRealCLE_symm self.bob.1.vel τ
+        (self.bob.1.pos_twice_differentiable self.isInertial.out).2.differentiableAt
   have x_has_deriv : HasDerivAt x (vx τ) τ := by
     convert (componentCLM (system := self.toSystem) 0).hasFDerivAt.comp_hasDerivAt τ
       pos_has_deriv using 1 <;> rfl
@@ -1127,6 +1156,7 @@ lemma angular_acceleration_eq (self : Pendulum) (t : Time) :
       fun s : Time ↦ (x s.val * vy s.val - y s.val * vx s.val) / self.L ^ 2 := by
     funext s
     rw [angular_velocity_eq self s]
+    simp only [PointParticle.System.Particle.pos, PointParticle.System.Particle.vel]
     dsimp only [x, y, vx, vy]
     rw [show Time.toRealCLE.symm s.val = s by
       exact Time.toRealCLE.symm_apply_apply s]
@@ -1137,112 +1167,55 @@ lemma angular_acceleration_eq (self : Pendulum) (t : Time) :
   have cross_time_deriv := time_deriv_comp_val (t := t) cross_has_deriv
   simp only [Pi.mul_apply, Pi.sub_apply] at cross_time_deriv
   rw [cross_time_deriv]
+  simp only [PointParticle.System.Particle.pos, PointParticle.System.Particle.acc]
   change ((vx τ * vy τ + x τ * ay) - (vy τ * vx τ + y τ * ax)) / self.L ^ 2 = _
   simp only [τ, x, y, vx, vy, ContinuousLinearEquiv.symm_apply_apply]
   ring
 
 lemma tension_source_eq_pivot (self : Pendulum) :
     self.tension.source = self.pivot := by
-  have tension_mem : self.tension ∈ self.internalForces := by
-    rw [self.no_other_internal_forces]
-    simp
-  have source_mem : self.tension.source ∈ self.particles := by
-    apply self.forces_involve_self
-    simp only [ReferenceFrame.particlesInvolved, Finset.mem_union,
-      Multiset.mem_toFinset, Multiset.mem_map]
-    left
-    left
-    exact ⟨self.tension, tension_mem, rfl⟩
-  let source : self.Particle := ⟨self.tension.source, source_mem⟩
-  have source_cases : source = self.pivot ∨ source = self.bob := by
-    have source_mem_univ : source ∈ (Set.univ : Set self.Particle) := Set.mem_univ source
+  have source_cases : self.tension.source = self.pivot ∨ self.tension.source = self.bob := by
+    have source_mem_univ : self.tension.source ∈ (Set.univ : Set self.Particle) :=
+      Set.mem_univ _
     rw [self.no_other_particles] at source_mem_univ
     simpa only [Set.mem_insert_iff, Set.mem_singleton_iff] using source_mem_univ
-  have source_ne_bob : source ≠ self.bob := by
+  have source_ne_bob : self.tension.source ≠ self.bob := by
     intro source_eq_bob
-    apply self.tension.source_ne_target
-    calc
-      self.tension.source = (source : self.frame.Particle) := rfl
-      _ = self.bob := congrArg ParticleMechanics.System.Particle.toParticle source_eq_bob
-      _ = self.tension.target := self.tension_targets_bob.symm
-  exact congrArg ParticleMechanics.System.Particle.toParticle
-    (source_cases.resolve_right source_ne_bob)
+    apply self.tension.1.source_ne_target
+    exact source_eq_bob.trans self.tension_targets_bob.symm
+  exact source_cases.resolve_right source_ne_bob
 
 lemma pivot_ne_bob (self : Pendulum) : self.pivot ≠ self.bob := by
   intro pivot_eq_bob
-  apply self.tension.source_ne_target
+  apply self.tension.1.source_ne_target
   calc
     self.tension.source = self.pivot := tension_source_eq_pivot self
-    _ = self.bob := congrArg ParticleMechanics.System.Particle.toParticle pivot_eq_bob
+    _ = self.bob := pivot_eq_bob
     _ = self.tension.target := self.tension_targets_bob.symm
 
-lemma system_particle_eq_of_toParticle_eq
-    {system : ParticleMechanics.System 2} {particle₁ particle₂ : system.Particle}
-    (particle_eq : particle₁.toParticle = particle₂.toParticle) :
-    particle₁ = particle₂ := by
-  rcases particle₁ with ⟨particle₁, particle₁_mem⟩
-  rcases particle₂ with ⟨particle₂, particle₂_mem⟩
-  simp only at particle_eq
-  subst particle₂
-  rfl
-
 lemma bob_newton_second_law (self : Pendulum) (t : Time) :
-    self.tension t + gravity self.bob self.g t = self.bob.mass • self.bob.acc t := by
-  have second_law := self.newton_second_law self.bob self.bob.membership t
+    self.tension.value t + gravity self.bob self.g t =
+      self.bob.mass • self.bob.acc t := by
+  have second_law := congrFun (self.newton_second_law self.bob) t
   rw [self.no_other_internal_forces, self.no_other_external_forces] at second_law
-  have pivot_ne_bob' :
-      (self.pivot : self.frame.Particle) ≠ (self.bob : self.frame.Particle) := by
-    intro pivot_eq_bob
-    exact pivot_ne_bob self (system_particle_eq_of_toParticle_eq pivot_eq_bob)
-  have tension_target : self.tension.target = (self.bob : self.frame.Particle) :=
-    self.tension_targets_bob
-  have reverse_target_ne :
-      self.tension.reverse.target ≠ (self.bob : self.frame.Particle) := by
-    change self.tension.source ≠ (self.bob : self.frame.Particle)
-    rw [tension_source_eq_pivot self]
-    exact pivot_ne_bob'
-  have gravity_bob_target :
-      (gravity self.bob self.g).target = (self.bob : self.frame.Particle) := rfl
-  have gravity_pivot_target_ne :
-      (gravity self.pivot self.g).target ≠ (self.bob : self.frame.Particle) :=
-    pivot_ne_bob'
-  have support_target_ne :
-      self.pivotSupportForce.target ≠ (self.bob : self.frame.Particle) := by
-    rw [self.support_targets_pivot]
-    exact pivot_ne_bob'
-  have internal_filter :
-      ({self.tension, self.tension.reverse} : Multiset self.frame.InternalForce).filter
-          (fun force ↦ force.target = (self.bob : self.frame.Particle)) = {self.tension} := by
-    change Multiset.filter (fun force : self.frame.InternalForce ↦ force.target = self.bob)
-      (self.tension ::ₘ {self.tension.reverse}) = {self.tension}
-    simp only [← Multiset.cons_zero]
-    rw [Multiset.filter_cons_of_pos
-      (p := fun force : self.frame.InternalForce ↦ force.target = self.bob) _ tension_target,
-      Multiset.filter_cons_of_neg
-        (p := fun force : self.frame.InternalForce ↦ force.target = self.bob) _ reverse_target_ne]
-    simp
-  have external_filter :
-      ({gravity self.bob self.g, gravity self.pivot self.g,
-          self.pivotSupportForce} : Multiset self.frame.Force).filter
-          (fun force ↦ force.target = (self.bob : self.frame.Particle)) =
-            {gravity self.bob self.g} := by
-    change Multiset.filter (fun force : self.frame.Force ↦ force.target = self.bob)
-      (gravity self.bob self.g ::ₘ gravity self.pivot self.g ::ₘ {self.pivotSupportForce}) =
-        {gravity self.bob self.g}
-    simp only [← Multiset.cons_zero]
-    rw [Multiset.filter_cons_of_pos
-      (p := fun force : self.frame.Force ↦ force.target = self.bob) _ gravity_bob_target,
-      Multiset.filter_cons_of_neg
-        (p := fun force : self.frame.Force ↦ force.target = self.bob) _ gravity_pivot_target_ne,
-      Multiset.filter_cons_of_neg
-        (p := fun force : self.frame.Force ↦ force.target = self.bob) _ support_target_ne]
-    simp
-  simp only [ReferenceFrame.Particle.netForce,
-    ReferenceFrame.Particle.netExternalForce] at second_law
-  rw [internal_filter, external_filter] at second_law
-  rw [← multiset_sum_eq_fintype_sum {self.tension} (fun force ↦ force t),
-    ← multiset_sum_eq_fintype_sum {gravity self.bob self.g} (fun force ↦ force t)] at second_law
-  simpa using second_law
+  rw [netForce_eq_multiset_sum] at second_law
+  have tension_target : self.tension.1.target = self.bob := self.tension_targets_bob
+  have reverse_target_ne : self.tension.reverse.1.target ≠ self.bob := by
+    change self.tension.source ≠ self.bob
+    rw [tension_source_eq_pivot]
+    exact pivot_ne_bob self
+  have gravity_bob_target : (gravity self.bob self.g).target = self.bob := rfl
+  have gravity_pivot_target_ne : (gravity self.pivot self.g).target ≠ self.bob :=
+    pivot_ne_bob self
+  have support_target_ne : self.pivotSupportForce.inner.target ≠ self.bob := by
+    rw [show self.pivotSupportForce.inner.target = self.pivot by
+      exact self.support_targets_pivot]
+    exact pivot_ne_bob self
+  simp [Multiset.filter_singleton, tension_target, reverse_target_ne,
+    gravity_bob_target, gravity_pivot_target_ne, support_target_ne] at second_law
+  have bob_acc_eq : self.bob.1.acc t = self.bob.acc t := rfl
+  simpa only [PointParticle.System.InternalForce.value,
+    PointParticle.System.Particle.mass, bob_acc_eq, add_comm] using second_law
 
 lemma horizontal_position_eq (self : Pendulum) (t : Time) :
     (self.bob.pos t).components 0 = self.L * Real.Angle.sin (self.θ t) := by
@@ -1276,49 +1249,25 @@ lemma bob_torque_eq (self : Pendulum) (t : Time) :
     (self.bob.pos t).components 0 * (self.bob.acc t).components 1 -
         (self.bob.pos t).components 1 * (self.bob.acc t).components 0 =
       -self.g * (self.bob.pos t).components 0 := by
-  let x := (self.bob.pos t).components 0
-  let y := (self.bob.pos t).components 1
-  let ax := (self.bob.acc t).components 0
-  let ay := (self.bob.acc t).components 1
   obtain ⟨c, tension_central⟩ := self.tension_central t
-  have tension_eq : self.tension t = (-c) • self.bob.pos t := by
-    calc
-      self.tension t = c • (self.tension.source.pos t - self.tension.target.pos t) :=
-        tension_central
-      _ = (-c) • self.bob.pos t := by
-        rw [tension_source_eq_pivot self, self.tension_targets_bob,
-          self.pivot_at_origin]
-        simp only [Pi.zero_apply, zero_sub, smul_neg, neg_smul]
-  have tension_x : (self.tension t).components 0 = -c * x := by
-    calc
-      (self.tension t).components 0 =
-          componentCLM (system := self.toSystem) 0 (self.tension t) := rfl
-      _ = componentCLM (system := self.toSystem) 0 ((-c) • self.bob.pos t) :=
-        congrArg (componentCLM (system := self.toSystem) 0) tension_eq
-      _ = -c * x := by rw [map_smul]; rfl
-  have tension_y : (self.tension t).components 1 = -c * y := by
-    calc
-      (self.tension t).components 1 =
-          componentCLM (system := self.toSystem) 1 (self.tension t) := rfl
-      _ = componentCLM (system := self.toSystem) 1 ((-c) • self.bob.pos t) :=
-        congrArg (componentCLM (system := self.toSystem) 1) tension_eq
-      _ = -c * y := by rw [map_smul]; rfl
+  have pivot_pos : self.pivot.pos t = 0 := congrFun self.pivot_at_origin t
+  rw [self.tension_targets_bob, tension_source_eq_pivot, pivot_pos, sub_zero]
+    at tension_central
   have second_law := bob_newton_second_law self t
-  have second_law_x := congrArg (fun v ↦ v.components 0) second_law
-  have second_law_y := congrArg (fun v ↦ v.components 1) second_law
-  change (self.tension t).components 0 + 0 = self.bob.mass * ax at second_law_x
-  change (self.tension t).components 1 + (-self.bob.mass * self.g) =
-    self.bob.mass * ay at second_law_y
-  rw [tension_x] at second_law_x
-  rw [tension_y] at second_law_y
-  apply mul_left_cancel₀ (ne_of_gt self.bob.mass.property)
-  calc
-    self.bob.mass * (x * ay - y * ax) =
-        x * (self.bob.mass * ay) - y * (self.bob.mass * ax) := by ring
-    _ = x * (-c * y + (-self.bob.mass * self.g)) - y * (-c * x) := by
-      rw [← second_law_x, ← second_law_y]
-      ring
-    _ = self.bob.mass * (-self.g * x) := by ring
+  rw [tension_central] at second_law
+  have horizontal := congrArg (fun v ↦ v.components 0) second_law
+  have vertical := congrArg (fun v ↦ v.components 1) second_law
+  simp [gravity] at horizontal vertical
+  have mass_pos := self.bob.mass.property
+  have torque_scaled : self.bob.mass.val *
+      ((self.bob.pos t).components 0 * (self.bob.acc t).components 1 -
+        (self.bob.pos t).components 1 * (self.bob.acc t).components 0 +
+        self.g.val * (self.bob.pos t).components 0) = 0 := by
+    linear_combination
+      -((self.bob.pos t).components 0) * vertical +
+        (self.bob.pos t).components 1 * horizontal
+  have torque_zero := (mul_eq_zero.mp torque_scaled).resolve_left (ne_of_gt mass_pos)
+  linarith
 
 lemma differential_equation (self : Pendulum) (t : Time) :
     Time.deriv self.ω t = -self.g / self.L * Real.Angle.sin (self.θ t) := by
@@ -1333,164 +1282,450 @@ lemma differential_equation (self : Pendulum) (t : Time) :
       rw [horizontal_position_eq self t]
       field_simp [ne_of_gt self.L.property]
 
-lemma specs_uniqueness (system : ParticleMechanics.System 2) (self : Specs system) :
+lemma bounded_function_not_constant_negative_second_deriv
+    (f : ℝ → ℝ) (B a : ℝ)
+    (B_nonnegative : 0 ≤ B)
+    (f_bounded : ∀ t, |f t| ≤ B)
+    (f_differentiable : Differentiable ℝ f)
+    (deriv_differentiable : Differentiable ℝ (deriv f))
+    (second_deriv_eq : ∀ t, deriv (deriv f) t = a)
+    (a_negative : a < 0) : False := by
+  let v0 := deriv f 0
+  let linear : ℝ → ℝ := fun t ↦ a * t
+  let q := deriv f - linear
+  have q_differentiable : Differentiable ℝ q := by
+    dsimp only [q, linear]
+    fun_prop
+  have q_deriv_zero (t : ℝ) : deriv q t = 0 := by
+    have linear_deriv : HasDerivAt linear a t := by
+      exact ((hasDerivAt_id t).const_mul a).congr_deriv (by ring)
+    have q_deriv : HasDerivAt q (deriv (deriv f) t - a) t :=
+      (deriv_differentiable t).hasDerivAt.sub linear_deriv
+    rw [q_deriv.deriv, second_deriv_eq]
+    ring
+  have deriv_eq (t : ℝ) : deriv f t = a * t + v0 := by
+    have q_eq := is_const_of_deriv_eq_zero q_differentiable q_deriv_zero t 0
+    simp only [q, linear, Pi.sub_apply] at q_eq
+    linarith
+  let polynomial : ℝ → ℝ :=
+    (fun t ↦ a / 2 * t ^ 2) + fun t ↦ v0 * t
+  let r := f - polynomial
+  have r_differentiable : Differentiable ℝ r := by
+    dsimp only [r, polynomial]
+    fun_prop
+  have r_deriv_zero (t : ℝ) : deriv r t = 0 := by
+    have polynomial_deriv : HasDerivAt polynomial (a * t + v0) t := by
+      apply HasDerivAt.congr_deriv
+        ((((hasDerivAt_id t).pow 2).const_mul (a / 2)).add
+          ((hasDerivAt_id t).const_mul v0))
+      simp only [id_eq]
+      ring
+    have r_deriv : HasDerivAt r (deriv f t - (a * t + v0)) t :=
+      (f_differentiable t).hasDerivAt.sub polynomial_deriv
+    rw [r_deriv.deriv, deriv_eq]
+    ring
+  have function_eq (t : ℝ) : f t = a / 2 * t ^ 2 + v0 * t + f 0 := by
+    have r_eq := is_const_of_deriv_eq_zero r_differentiable r_deriv_zero t 0
+    simp only [r, polynomial, Pi.sub_apply, Pi.add_apply] at r_eq
+    linarith
+  let A := -a
+  let C := |f 0| + B + 1
+  let t := C / A + 1
+  have A_positive : 0 < A := by simp only [A]; linarith
+  have C_positive : 0 < C := by
+    dsimp only [C]
+    linarith [abs_nonneg (f 0)]
+  have quadratic_dominates : 2 * C < A * t ^ 2 := by
+    have A_ne_zero := ne_of_gt A_positive
+    have C_sq_div_nonnegative : 0 ≤ C ^ 2 / A :=
+      div_nonneg (sq_nonneg C) A_positive.le
+    have expansion : A * t ^ 2 = C ^ 2 / A + 2 * C + A := by
+      dsimp only [t]
+      field_simp [A_ne_zero]
+      ring
+    rw [expansion]
+    linarith
+  have quadratic_lt : a * t ^ 2 + 2 * f 0 < -2 * B := by
+    have f_zero_le : f 0 ≤ |f 0| := le_abs_self (f 0)
+    dsimp only [A, C] at quadratic_dominates
+    linarith
+  have lower_at_t := (abs_le.mp (f_bounded t)).1
+  have lower_at_neg_t := (abs_le.mp (f_bounded (-t))).1
+  rw [function_eq t] at lower_at_t
+  rw [function_eq (-t)] at lower_at_neg_t
+  nlinarith
+
+lemma specs_uniqueness (system : PointParticle.System 2) (self : Specs system) :
     Set.univ = {self} := by
-  have particle_eq_of_toParticle_eq {particle₁ particle₂ : system.Particle}
-      (particle_eq : particle₁.toParticle = particle₂.toParticle) :
-      particle₁ = particle₂ := by
-    rcases particle₁ with ⟨particle₁, particle₁_mem⟩
-    rcases particle₂ with ⟨particle₂, particle₂_mem⟩
-    simp only at particle_eq
-    subst particle₂
-    rfl
-
-  have particle_cases (specs : Specs system) (particle : system.Particle) :
-      particle = specs.pivot ∨ particle = specs.bob := by
-    have particle_mem : particle ∈ ({specs.pivot, specs.bob} : Set system.Particle) := by
-      rw [← specs.no_other_particles]
-      exact Set.mem_univ particle
-    simpa only [Set.mem_insert_iff, Set.mem_singleton_iff] using particle_mem
-
-  have tension_source_eq_pivot (specs : Specs system) :
-      specs.tension.source = specs.pivot := by
-    have tension_mem : specs.tension ∈ system.internalForces := by
-      rw [specs.no_other_internal_forces]
-      simp
-    have source_mem : specs.tension.source ∈ system.particles := by
-      apply system.forces_involve_self
-      simp only [ReferenceFrame.particlesInvolved, Finset.mem_union,
-        Multiset.mem_toFinset, Multiset.mem_map]
-      left
-      left
-      exact ⟨specs.tension, tension_mem, rfl⟩
-    let source : system.Particle := ⟨specs.tension.source, source_mem⟩
-    have source_ne_bob : source ≠ specs.bob := by
-      intro source_eq_bob
-      apply specs.tension.source_ne_target
-      calc
-        specs.tension.source = (source : system.frame.Particle) := rfl
-        _ = specs.bob := congrArg ParticleMechanics.System.Particle.toParticle source_eq_bob
-        _ = specs.tension.target := specs.tension_targets_bob.symm
-    have source_eq_pivot := (particle_cases specs source).resolve_right source_ne_bob
-    exact congrArg ParticleMechanics.System.Particle.toParticle source_eq_pivot
-
-  have pivot_ne_bob (specs : Specs system) : specs.pivot ≠ specs.bob := by
+  ext other
+  simp only [Set.mem_univ, Set.mem_singleton_iff, true_iff]
+  have self_pivot_ne_bob : self.pivot ≠ self.bob := by
     intro pivot_eq_bob
-    apply specs.tension.source_ne_target
-    calc
-      specs.tension.source = specs.pivot := tension_source_eq_pivot specs
-      _ = specs.bob := congrArg ParticleMechanics.System.Particle.toParticle pivot_eq_bob
-      _ = specs.tension.target := specs.tension_targets_bob.symm
-
-  apply Set.eq_singleton_iff_unique_mem.mpr
-  refine ⟨Set.mem_univ self, ?_⟩
-  intro other _
-
-  have pivot_eq : other.pivot = self.pivot := by
-    rcases particle_cases self other.pivot with pivot_eq | pivot_eq
+    have length_at_zero := self.length_constant 0
+    have pivot_at_zero := congrFun self.pivot_at_origin 0
+    rw [← pivot_eq_bob, pivot_at_zero] at length_at_zero
+    have L_eq_zero : self.L.val = 0 := by simpa using length_at_zero.symm
+    exact (ne_of_gt self.L.property) L_eq_zero
+  have self_particle_cases (particle : system.Particle) :
+      particle = self.pivot ∨ particle = self.bob := by
+    have particle_mem : particle ∈ (Set.univ : Set system.Particle) := Set.mem_univ particle
+    rw [self.no_other_particles] at particle_mem
+    simpa only [Set.mem_insert_iff, Set.mem_singleton_iff] using particle_mem
+  have pivots_eq : other.pivot = self.pivot := by
+    rcases self_particle_cases other.pivot with pivot_eq | pivot_eq
     · exact pivot_eq
     · exfalso
-      apply ne_of_gt self.L.property
-      calc
-        self.L.val = ‖self.bob.pos 0‖ := (self.length_constant 0).symm
-        _ = ‖other.pivot.pos 0‖ := by rw [pivot_eq]
-        _ = 0 := by rw [other.pivot_at_origin]; simp
-
-  have bob_eq : other.bob = self.bob := by
-    apply (particle_cases self other.bob).resolve_left
-    intro bob_eq_pivot
-    apply pivot_ne_bob other
-    exact pivot_eq.trans bob_eq_pivot.symm
-
-  have L_eq : other.L = self.L := by
-    apply Subtype.ext
-    calc
-      other.L.val = ‖other.bob.pos 0‖ := (other.length_constant 0).symm
-      _ = ‖self.bob.pos 0‖ := by rw [bob_eq]
-      _ = self.L.val := self.length_constant 0
-
-  have tension_eq : other.tension = self.tension := by
-    have tension_mem : other.tension ∈ system.internalForces := by
-      rw [other.no_other_internal_forces]
-      simp
-    have tension_cases :
-        other.tension = self.tension ∨ other.tension = self.tension.reverse := by
-      have : other.tension ∈ ({self.tension, self.tension.reverse} :
-          Multiset system.frame.InternalForce) := by
-        rw [← self.no_other_internal_forces]
-        exact tension_mem
-      simpa using this
-    rcases tension_cases with tension_eq | tension_reverse_eq
-    · exact tension_eq
+      have length_at_zero := self.length_constant 0
+      have other_pivot_at_zero := congrFun other.pivot_at_origin 0
+      rw [← pivot_eq, other_pivot_at_zero] at length_at_zero
+      have L_eq_zero : self.L.val = 0 := by simpa using length_at_zero.symm
+      exact (ne_of_gt self.L.property) L_eq_zero
+  have bobs_eq : other.bob = self.bob := by
+    rcases self_particle_cases other.bob with bob_eq | bob_eq
     · exfalso
-      apply pivot_ne_bob self
-      apply particle_eq_of_toParticle_eq
+      have other_length_at_zero := other.length_constant 0
+      have self_pivot_at_zero := congrFun self.pivot_at_origin 0
+      rw [bob_eq, self_pivot_at_zero] at other_length_at_zero
+      have L_eq_zero : other.L.val = 0 := by simpa using other_length_at_zero.symm
+      exact (ne_of_gt other.L.property) L_eq_zero
+    · exact bob_eq
+  have lengths_eq : other.L = self.L := by
+    apply Subtype.ext
+    have other_length_at_zero := other.length_constant 0
+    rw [bobs_eq] at other_length_at_zero
+    exact other_length_at_zero.symm.trans (self.length_constant 0)
+  have self_tension_source_eq : self.tension.source = self.pivot := by
+    rcases self_particle_cases self.tension.source with source_eq | source_eq
+    · exact source_eq
+    · exfalso
+      apply self.tension.1.source_ne_target
+      exact source_eq.trans self.tension_targets_bob.symm
+  let other_tension_value : system.frame.InternalForce system.Particle := other.tension.1
+  let self_tension_value : system.frame.InternalForce system.Particle := self.tension.1
+  let self_reverse_value : system.frame.InternalForce system.Particle := self.tension.reverse.1
+  have other_tension_mem : other_tension_value ∈ system.internalForces :=
+    Multiset.count_pos.mp (Nat.zero_lt_of_lt other.tension.2.isLt)
+  rw [self.no_other_internal_forces] at other_tension_mem
+  have other_tension_cases :
+      other_tension_value = self_tension_value ∨ other_tension_value = self_reverse_value := by
+    rcases Multiset.mem_cons.mp other_tension_mem with tension_eq | tension_eq
+    · exact Or.inl tension_eq
+    · exact Or.inr (Multiset.mem_singleton.mp tension_eq)
+  have tension_values_eq : other.tension.1 = self.tension.1 := by
+    rcases other_tension_cases with tension_eq | tension_eq
+    · simpa only [other_tension_value, self_tension_value] using tension_eq
+    · exfalso
+      apply self_pivot_ne_bob
+      have targets_eq := congrArg
+        (fun force : system.frame.InternalForce system.Particle ↦ force.target)
+        tension_eq.symm
       calc
-        self.pivot = self.tension.source := (tension_source_eq_pivot self).symm
-        _ = self.tension.reverse.target := rfl
-        _ = other.tension.target := congrArg
-          (fun force : system.frame.InternalForce ↦ force.target) tension_reverse_eq.symm
+        self.pivot = self.tension.source := self_tension_source_eq.symm
+        _ = self.tension.reverse.1.target := rfl
+        _ = other.tension.1.target := by
+          simpa only [other_tension_value, self_reverse_value] using targets_eq
         _ = other.bob := other.tension_targets_bob
-        _ = self.bob := congrArg ParticleMechanics.System.Particle.toParticle bob_eq
-
-  have gravity_eq : gravity other.bob other.g = gravity self.bob self.g := by
-    have gravity_mem : gravity other.bob other.g ∈ system.externalForces := by
-      rw [other.no_other_external_forces]
-      simp
-    have gravity_cases : gravity other.bob other.g = gravity self.bob self.g ∨
-        gravity other.bob other.g = gravity self.pivot self.g ∨
-          gravity other.bob other.g = self.pivotSupportForce := by
-      have : gravity other.bob other.g ∈
-          ({gravity self.bob self.g, gravity self.pivot self.g,
-            self.pivotSupportForce} : Multiset system.frame.Force) := by
-        rw [← self.no_other_external_forces]
-        exact gravity_mem
-      simpa using this
-    rcases gravity_cases with gravity_eq | gravity_eq_pivot | gravity_eq_support
-    · exact gravity_eq
-    · exfalso
-      apply pivot_ne_bob self
-      apply particle_eq_of_toParticle_eq
-      calc
-        self.pivot = (gravity self.pivot self.g).target := rfl
-        _ = (gravity other.bob other.g).target :=
-          congrArg ReferenceFrame.Force.target gravity_eq_pivot.symm
-        _ = other.bob := rfl
-        _ = self.bob := congrArg ParticleMechanics.System.Particle.toParticle bob_eq
-    · exfalso
-      apply pivot_ne_bob self
-      apply particle_eq_of_toParticle_eq
-      calc
-        self.pivot = self.pivotSupportForce.target := self.support_targets_pivot.symm
-        _ = (gravity other.bob other.g).target := congrArg ReferenceFrame.Force.target
-          gravity_eq_support.symm
-        _ = other.bob := rfl
-        _ = self.bob := congrArg ParticleMechanics.System.Particle.toParticle bob_eq
-
-  have g_eq : other.g = self.g := by
+        _ = self.bob := bobs_eq
+  have tension_ne_reverse : self.tension.1 ≠ self.tension.reverse.1 := by
+    intro tension_eq
+    apply self_pivot_ne_bob
+    have targets_eq := congrArg
+      (fun force : system.frame.InternalForce system.Particle ↦ force.target)
+      tension_eq.symm
+    calc
+      self.pivot = self.tension.source := self_tension_source_eq.symm
+      _ = self.tension.reverse.1.target := rfl
+      _ = self.tension.1.target := targets_eq
+      _ = self.bob := self.tension_targets_bob
+  have tension_count : Multiset.count self.tension.1 system.internalForces = 1 := by
+    calc
+      _ = Multiset.count self.tension.1
+          {self.tension.1, self.tension.reverse.1} :=
+        congrArg (Multiset.count self.tension.1) self.no_other_internal_forces
+      _ = 1 := by simp [tension_ne_reverse]
+  have tensions_eq : other.tension = self.tension := by
+    apply Sigma.ext
+    · exact tension_values_eq
+    · apply (Fin.heq_ext_iff (congrArg
+        (fun force ↦ Multiset.count force system.internalForces) tension_values_eq)).2
+      have other_count : Multiset.count other.tension.1 system.internalForces = 1 :=
+        (congrArg (fun force ↦ Multiset.count force system.internalForces)
+          tension_values_eq).trans tension_count
+      have other_index_lt := other.tension.2.isLt
+      have self_index_lt := self.tension.2.isLt
+      omega
+  have external_forces_eq :
+      ({gravity self.bob other.g, gravity self.pivot other.g, ↑other.pivotSupportForce} :
+        Multiset (system.frame.Force system.Particle)) =
+      ({gravity self.bob self.g, gravity self.pivot self.g, ↑self.pivotSupportForce} :
+        Multiset (system.frame.Force system.Particle)) := by
+    simpa only [bobs_eq, pivots_eq] using
+      other.no_other_external_forces.symm.trans self.no_other_external_forces
+  have other_support_target : other.pivotSupportForce.inner.target = self.pivot := by
+    rw [← pivots_eq]
+    exact other.support_targets_pivot
+  have self_support_target : self.pivotSupportForce.inner.target = self.pivot :=
+    self.support_targets_pivot
+  have gravity_bob_eq : gravity self.bob other.g = gravity self.bob self.g := by
+    have filtered_eq := congrArg
+      (Multiset.filter fun force ↦ force.target = self.bob) external_forces_eq
+    simpa [Multiset.filter_cons, Multiset.filter_singleton, gravity, self_pivot_ne_bob,
+      other_support_target, self_support_target] using filtered_eq
+  have gravity_value_eq := congrArg
+    (fun force ↦ (force.value 0).components 1) gravity_bob_eq
+  simp only [gravity, Matrix.cons_val_one, Matrix.cons_val_zero] at gravity_value_eq
+  have gravities_eq : other.g = self.g := by
     apply Subtype.ext
-    have components_eq := congrArg
-      (fun force : system.frame.Force ↦ (force 0).components (1 : Fin 2)) gravity_eq
-    simp only [gravity, Matrix.cons_val_one, Matrix.cons_val_zero] at components_eq
-    rw [bob_eq] at components_eq
-    have mass_pos := self.bob.mass.property
-    nlinarith
-
-  have support_eq : other.pivotSupportForce = self.pivotSupportForce := by
-    have external_forces_eq :
-        ({gravity self.bob self.g, gravity self.pivot self.g,
-          other.pivotSupportForce} : Multiset system.frame.Force) =
-            {gravity self.bob self.g, gravity self.pivot self.g,
-              self.pivotSupportForce} := by
-      calc
-        {gravity self.bob self.g, gravity self.pivot self.g, other.pivotSupportForce} =
-            {gravity other.bob other.g, gravity other.pivot other.g,
-              other.pivotSupportForce} := by rw [bob_eq, pivot_eq, g_eq]
-        _ = system.externalForces := other.no_other_external_forces.symm
-        _ = {gravity self.bob self.g, gravity self.pivot self.g,
-            self.pivotSupportForce} := self.no_other_external_forces
-    simpa using external_forces_eq
-
+    apply mul_left_cancel₀ (ne_of_gt self.bob.mass.property)
+    linarith
+  have support_values_eq : other.pivotSupportForce.inner = self.pivotSupportForce.inner := by
+    rw [gravities_eq] at external_forces_eq
+    have without_bob_gravity :=
+      (Multiset.cons_inj_right (gravity self.bob self.g)).mp external_forces_eq
+    have without_pivot_gravity :=
+      (Multiset.cons_inj_right (gravity self.pivot self.g)).mp without_bob_gravity
+    simpa using without_pivot_gravity
+  let y := fun t : ℝ ↦
+    (self.bob.pos (Time.toRealCLE.symm t)).components 1
+  have position_deriv (t : ℝ) :
+      HasDerivAt (fun s : ℝ ↦ self.bob.1.pos (Time.toRealCLE.symm s))
+        (self.bob.1.vel (Time.toRealCLE.symm t)) t := by
+    simpa only [ReferenceFrame.Particle.vel] using
+      hasDerivAt_comp_toRealCLE_symm self.bob.1.pos t
+        (self.bob.1.pos_twice_differentiable system.isInertial.out).1.differentiableAt
+  have y_deriv (t : ℝ) : HasDerivAt y
+      ((self.bob.vel (Time.toRealCLE.symm t)).components 1) t := by
+    convert (componentCLM (system := system) 1).hasFDerivAt.comp_hasDerivAt t
+      (position_deriv t) using 1 <;> rfl
+  have velocity_deriv (t : ℝ) :
+      HasDerivAt (fun s : ℝ ↦ self.bob.1.vel (Time.toRealCLE.symm s))
+        (self.bob.1.acc (Time.toRealCLE.symm t)) t := by
+    simpa only [ReferenceFrame.Particle.acc] using
+      hasDerivAt_comp_toRealCLE_symm self.bob.1.vel t
+        (self.bob.1.pos_twice_differentiable system.isInertial.out).2.differentiableAt
+  have vertical_velocity_deriv (t : ℝ) :
+      HasDerivAt (fun s : ℝ ↦ (self.bob.vel (Time.toRealCLE.symm s)).components 1)
+        ((self.bob.acc (Time.toRealCLE.symm t)).components 1) t := by
+    convert (componentCLM (system := system) 1).hasFDerivAt.comp_hasDerivAt t
+      (velocity_deriv t) using 1 <;> rfl
+  have deriv_y_eq : deriv y =
+      fun t ↦ (self.bob.vel (Time.toRealCLE.symm t)).components 1 := by
+    funext t
+    exact (y_deriv t).deriv
+  have y_differentiable : Differentiable ℝ y := fun t ↦ (y_deriv t).differentiableAt
+  have deriv_y_differentiable : Differentiable ℝ (deriv y) := by
+    rw [deriv_y_eq]
+    exact fun t ↦ (vertical_velocity_deriv t).differentiableAt
+  have second_deriv_y_eq (t : ℝ) :
+      deriv (deriv y) t =
+        (self.bob.acc (Time.toRealCLE.symm t)).components 1 := by
+    rw [deriv_y_eq]
+    exact (vertical_velocity_deriv t).deriv
+  have y_bounded (t : ℝ) : |y t| ≤ self.L.val := by
+    have norm_eq := self.length_constant (Time.toRealCLE.symm t)
+    rw [vector_norm_l2_if_orthonormal self.orthonormal,
+      Fin.sum_univ_two] at norm_eq
+    have norm_sq := congrArg (fun r : ℝ ↦ r ^ 2) norm_eq
+    rw [Real.sq_sqrt (add_nonneg (sq_nonneg _) (sq_nonneg _))] at norm_sq
+    have y_abs_nonnegative := abs_nonneg (y t)
+    have y_abs_sq : |y t| ^ 2 = y t ^ 2 := sq_abs (y t)
+    dsimp only [y]
+    dsimp only [y] at y_abs_nonnegative y_abs_sq
+    nlinarith [sq_nonneg
+      ((self.bob.pos (Time.toRealCLE.symm t)).components 0), self.L.property]
+  have tension_target_ne_pivot : self.tension.1.target ≠ self.pivot := by
+    intro target_eq
+    apply self_pivot_ne_bob
+    exact (self.tension_targets_bob.symm.trans target_eq).symm
+  have reverse_target_pivot : self.tension.reverse.1.target = self.pivot := by
+    change self.tension.source = self.pivot
+    exact self_tension_source_eq
+  have gravity_bob_target_ne_pivot : (gravity self.bob self.g).target ≠ self.pivot :=
+    self_pivot_ne_bob.symm
+  have gravity_pivot_target : (gravity self.pivot self.g).target = self.pivot := rfl
+  have pivot_acc_zero (t : Time) : self.pivot.1.acc t = 0 := by
+    have pivot_pos : self.pivot.1.pos = 0 := by
+      funext s
+      have pivot_at_s := congrFun self.pivot_at_origin s
+      simpa only [PointParticle.System.Particle.pos] using pivot_at_s
+    rw [ReferenceFrame.Particle.acc, ReferenceFrame.Particle.vel, pivot_pos]
+    have derivative_zero : Time.deriv (0 : Time → system.Vector) = 0 := by
+      funext s
+      exact Time.deriv_const (t := s) 0
+    rw [derivative_zero]
+    exact Time.deriv_const (t := t) 0
+  have pivot_second_law (t : Time) :
+      self.tension.reverse.1.value t + (gravity self.pivot self.g).value t +
+        self.pivotSupportForce.inner.value t = 0 := by
+    have second_law := congrFun (system.newton_second_law self.pivot) t
+    rw [self.no_other_internal_forces, self.no_other_external_forces] at second_law
+    rw [netForce_eq_multiset_sum] at second_law
+    simp [Multiset.filter_singleton, tension_target_ne_pivot,
+      reverse_target_pivot, gravity_bob_target_ne_pivot, gravity_pivot_target,
+      self_support_target, pivot_acc_zero] at second_law
+    have positive_smul_zero (m : ℝ+) : m • (0 : system.Vector) = 0 := by
+      change m.val • (0 : system.Vector) = 0
+      simp
+    simpa only [PointParticle.System.Particle.mass, positive_smul_zero, add_comm,
+      add_left_comm, add_assoc] using second_law
+  let pendulum : Pendulum := { toSystem := system, toSpecs := self }
+  have bob_second_law (t : Time) :
+      self.tension.1.value t + (gravity self.bob self.g).value t =
+        self.bob.mass • self.bob.acc t := by
+    simpa only [pendulum, PointParticle.System.InternalForce.value] using
+      bob_newton_second_law pendulum t
+  have support_ne_reverse :
+      self.pivotSupportForce.inner ≠ self.tension.reverse.1.toForce := by
+    intro support_eq
+    let a := -(self.pivot.mass.val * self.g.val / 2 +
+      self.bob.mass.val * self.g.val) / self.bob.mass.val
+    have acceleration_eq (t : Time) : (self.bob.acc t).components 1 = a := by
+      have pivot_vertical := congrArg (componentCLM (system := system) 1)
+        (pivot_second_law t)
+      have bob_vertical := congrArg (componentCLM (system := system) 1)
+        (bob_second_law t)
+      simp [gravity] at pivot_vertical bob_vertical
+      have support_vertical : (self.pivotSupportForce.inner.value t).components 1 =
+          (self.tension.reverse.1.value t).components 1 :=
+        congrArg (fun force ↦ (force.value t).components 1) support_eq
+      rw [support_vertical] at pivot_vertical
+      have reverse_vertical : (self.tension.reverse.1.value t).components 1 =
+          -(self.tension.1.value t).components 1 := rfl
+      rw [reverse_vertical] at pivot_vertical
+      dsimp only [a]
+      field_simp [ne_of_gt self.bob.mass.property]
+      nlinarith
+    have a_negative : a < 0 := by
+      dsimp only [a]
+      have numerator_positive : 0 < self.pivot.mass.val * self.g.val / 2 +
+          self.bob.mass.val * self.g.val := by
+        nlinarith [self.pivot.mass.property, self.bob.mass.property, self.g.property]
+      exact div_neg_of_neg_of_pos (neg_lt_zero.mpr numerator_positive)
+        self.bob.mass.property
+    exact bounded_function_not_constant_negative_second_deriv y self.L.val a
+      self.L.property.le y_bounded y_differentiable deriv_y_differentiable
+      (fun t ↦ (second_deriv_y_eq t).trans
+        (acceleration_eq (Time.toRealCLE.symm t))) a_negative
+  have support_ne_gravity_pivot :
+      self.pivotSupportForce.inner ≠ gravity self.pivot self.g := by
+    intro support_eq
+    let a := -(2 * self.pivot.mass.val * self.g.val +
+      self.bob.mass.val * self.g.val) / self.bob.mass.val
+    have acceleration_eq (t : Time) : (self.bob.acc t).components 1 = a := by
+      have pivot_vertical := congrArg (componentCLM (system := system) 1)
+        (pivot_second_law t)
+      have bob_vertical := congrArg (componentCLM (system := system) 1)
+        (bob_second_law t)
+      simp [gravity] at pivot_vertical bob_vertical
+      have support_vertical : (self.pivotSupportForce.inner.value t).components 1 =
+          ((gravity self.pivot self.g).value t).components 1 :=
+        congrArg (fun force ↦ (force.value t).components 1) support_eq
+      rw [support_vertical] at pivot_vertical
+      simp only [gravity, Matrix.cons_val_one, Matrix.cons_val_zero] at pivot_vertical
+      have reverse_vertical : (self.tension.reverse.1.value t).components 1 =
+          -(self.tension.1.value t).components 1 := rfl
+      rw [reverse_vertical] at pivot_vertical
+      dsimp only [a]
+      field_simp [ne_of_gt self.bob.mass.property]
+      nlinarith
+    have a_negative : a < 0 := by
+      dsimp only [a]
+      have numerator_positive : 0 < 2 * self.pivot.mass.val * self.g.val +
+          self.bob.mass.val * self.g.val := by
+        nlinarith [self.pivot.mass.property, self.bob.mass.property, self.g.property]
+      exact div_neg_of_neg_of_pos (neg_lt_zero.mpr numerator_positive)
+        self.bob.mass.property
+    exact bounded_function_not_constant_negative_second_deriv y self.L.val a
+      self.L.property.le y_bounded y_differentiable deriv_y_differentiable
+      (fun t ↦ (second_deriv_y_eq t).trans
+        (acceleration_eq (Time.toRealCLE.symm t))) a_negative
+  have support_ne_tension :
+      self.pivotSupportForce.inner ≠ self.tension.1.toForce := by
+    intro support_eq
+    apply self_pivot_ne_bob
+    calc
+      self.pivot = self.pivotSupportForce.target := self_support_target.symm
+      _ = self.tension.1.target :=
+        congrArg ReferenceFrame.Force.target support_eq
+      _ = self.bob := self.tension_targets_bob
+  have support_ne_gravity_bob :
+      self.pivotSupportForce.inner ≠ gravity self.bob self.g := by
+    intro support_eq
+    apply self_pivot_ne_bob
+    calc
+      self.pivot = self.pivotSupportForce.target := self_support_target.symm
+      _ = (gravity self.bob self.g).target :=
+        congrArg ReferenceFrame.Force.target support_eq
+      _ = self.bob := rfl
+  let support_value : system.frame.Force system.Particle := self.pivotSupportForce.inner
+  have support_count : Multiset.count support_value
+      system.externalForces = 1 := by
+    calc
+      _ = Multiset.count support_value
+          {gravity self.bob self.g, gravity self.pivot self.g,
+            self.pivotSupportForce.inner} := by
+        exact congrArg (Multiset.count support_value) self.no_other_external_forces
+      _ = 1 := by
+        simp [support_value, support_ne_gravity_bob, support_ne_gravity_pivot]
+  have support_is_external (support : system.Force)
+      (support_value_eq : support.inner = self.pivotSupportForce.inner) :
+      support.External := by
+    rcases support with internal | external
+    · exfalso
+      let internal_value : system.frame.InternalForce system.Particle := internal.1
+      have internal_mem : internal_value ∈ system.internalForces :=
+        Multiset.count_pos.mp (Nat.zero_lt_of_lt internal.2.isLt)
+      rw [self.no_other_internal_forces] at internal_mem
+      rcases Multiset.mem_cons.mp internal_mem with internal_eq | internal_eq
+      · apply support_ne_tension
+        calc
+          self.pivotSupportForce.inner = internal_value.toForce := by
+            simpa only [PointParticle.System.Force.inner] using support_value_eq.symm
+          _ = self.tension.1.toForce := congrArg ReferenceFrame.InternalForce.toForce internal_eq
+      · apply support_ne_reverse
+        calc
+          self.pivotSupportForce.inner = internal_value.toForce := by
+            simpa only [PointParticle.System.Force.inner] using support_value_eq.symm
+          _ = self.tension.reverse.1.toForce :=
+            congrArg ReferenceFrame.InternalForce.toForce (Multiset.mem_singleton.mp internal_eq)
+    · exact Sum.isRight_inr
+  have self_support_external : self.pivotSupportForce.External :=
+    support_is_external self.pivotSupportForce rfl
+  have other_support_external : other.pivotSupportForce.External :=
+    support_is_external other.pivotSupportForce support_values_eq
+  have support_forces_eq : other.pivotSupportForce = self.pivotSupportForce := by
+    let other_support := other.pivotSupportForce.getRight other_support_external
+    let self_support := self.pivotSupportForce.getRight self_support_external
+    have other_support_value : other_support.1 = other.pivotSupportForce.inner := by
+      simpa only [other_support, PointParticle.System.Force.inner] using
+        congrArg PointParticle.System.Force.inner
+          (Sum.inr_getRight other.pivotSupportForce other_support_external)
+    have self_support_value : self_support.1 = self.pivotSupportForce.inner := by
+      simpa only [self_support, PointParticle.System.Force.inner] using
+        congrArg PointParticle.System.Force.inner
+          (Sum.inr_getRight self.pivotSupportForce self_support_external)
+    have external_values_eq : other_support.1 = self_support.1 :=
+      other_support_value.trans (support_values_eq.trans self_support_value.symm)
+    have external_occurrences_eq : other_support = self_support := by
+      apply Sigma.ext
+      · exact external_values_eq
+      · apply (Fin.heq_ext_iff (congrArg
+          (fun force ↦ Multiset.count force system.externalForces) external_values_eq)).2
+        have other_count : Multiset.count other_support.1 system.externalForces = 1 := by
+          rw [external_values_eq, self_support_value]
+          exact support_count
+        have self_count : Multiset.count self_support.1 system.externalForces = 1 := by
+          rw [self_support_value]
+          exact support_count
+        have other_index_lt := other_support.2.isLt
+        have self_index_lt := self_support.2.isLt
+        omega
+    calc
+      other.pivotSupportForce = Sum.inr other_support :=
+        (Sum.inr_getRight other.pivotSupportForce other_support_external).symm
+      _ = Sum.inr self_support := congrArg Sum.inr external_occurrences_eq
+      _ = self.pivotSupportForce :=
+        Sum.inr_getRight self.pivotSupportForce self_support_external
   cases self
   cases other
   simp_all
@@ -2131,11 +2366,11 @@ lemma angularVelocity_differentiable (self : Pendulum) :
   let y := fun t ↦ (self.bob.pos t).components 1
   let vx := fun t ↦ (self.bob.vel t).components 0
   let vy := fun t ↦ (self.bob.vel t).components 1
-  have position_differentiable : Differentiable ℝ self.bob.pos :=
-    self.bob.pos_twice_differentiable.1
-  have velocity_differentiable : Differentiable ℝ self.bob.vel := by
+  have position_differentiable : Differentiable ℝ self.bob.1.pos :=
+    (self.bob.1.pos_twice_differentiable self.isInertial.out).1
+  have velocity_differentiable : Differentiable ℝ self.bob.1.vel := by
     simpa only [ReferenceFrame.Particle.vel] using
-      self.bob.pos_twice_differentiable.2
+      (self.bob.1.pos_twice_differentiable self.isInertial.out).2
   have x_differentiable : Differentiable ℝ x := fun t ↦ by
     exact ((componentCLM (system := self.toSystem) 0).hasFDerivAt.comp t
       (position_differentiable t).hasFDerivAt).differentiableAt
@@ -2174,16 +2409,16 @@ lemma velocity_components_eq (self : Pendulum) (t : Time) :
     (self.bob.vel t).components 0 = -self.ω t * (self.bob.pos t).components 1 ∧
       (self.bob.vel t).components 1 = self.ω t * (self.bob.pos t).components 0 := by
   let τ := Time.toRealCLE t
-  let x := fun s : ℝ ↦ (self.bob.pos (Time.toRealCLE.symm s)).components 0
-  let y := fun s : ℝ ↦ (self.bob.pos (Time.toRealCLE.symm s)).components 1
-  let vx := (self.bob.vel t).components 0
-  let vy := (self.bob.vel t).components 1
+  let x := fun s : ℝ ↦ (self.bob.1.pos (Time.toRealCLE.symm s)).components 0
+  let y := fun s : ℝ ↦ (self.bob.1.pos (Time.toRealCLE.symm s)).components 1
+  let vx := (self.bob.1.vel t).components 0
+  let vy := (self.bob.1.vel t).components 1
   have position_deriv : HasDerivAt
-      (fun s : ℝ ↦ self.bob.pos (Time.toRealCLE.symm s)) (self.bob.vel t) τ := by
+      (fun s : ℝ ↦ self.bob.1.pos (Time.toRealCLE.symm s)) (self.bob.1.vel t) τ := by
     simpa only [τ, ContinuousLinearEquiv.symm_apply_apply,
       ReferenceFrame.Particle.vel] using
-      hasDerivAt_comp_toRealCLE_symm self.bob.pos τ
-        self.bob.pos_twice_differentiable.1.differentiableAt
+      hasDerivAt_comp_toRealCLE_symm self.bob.1.pos τ
+        (self.bob.1.pos_twice_differentiable self.isInertial.out).1.differentiableAt
   have x_deriv : HasDerivAt x vx τ := by
     convert (componentCLM (system := self.toSystem) 0).hasFDerivAt.comp_hasDerivAt τ
       position_deriv using 1 <;> rfl
@@ -2194,7 +2429,8 @@ lemma velocity_components_eq (self : Pendulum) (t : Time) :
   have radius_eq : (fun s ↦ x s * x s + y s * y s) =
       fun _ ↦ self.L.val ^ 2 := by
     funext s
-    simpa only [pow_two] using position_components_sq self (Time.toRealCLE.symm s)
+    simpa only [pow_two, PointParticle.System.Particle.pos, x, y] using
+      position_components_sq self (Time.toRealCLE.symm s)
   have radius_deriv_zero : 2 * x τ * vx + 2 * y τ * vy = 0 := by
     have constant_deriv : HasDerivAt (fun _ : ℝ ↦ self.L.val ^ 2) 0 τ :=
       hasDerivAt_const τ _
@@ -2248,11 +2484,11 @@ lemma pendulumCirclePhase_hasDerivAt (self : Pendulum) (t : ℝ) :
     HasDerivAt (pendulumCirclePhase self)
       (circlePhaseField self.L self.g (pendulumCirclePhase self t)) t := by
   have position_deriv : HasDerivAt
-      (fun s : ℝ ↦ self.bob.pos (Time.toRealCLE.symm s))
-      (self.bob.vel (Time.toRealCLE.symm t)) t := by
+      (fun s : ℝ ↦ self.bob.1.pos (Time.toRealCLE.symm s))
+      (self.bob.1.vel (Time.toRealCLE.symm t)) t := by
     simpa only [ReferenceFrame.Particle.vel] using
-      hasDerivAt_comp_toRealCLE_symm self.bob.pos t
-        self.bob.pos_twice_differentiable.1.differentiableAt
+      hasDerivAt_comp_toRealCLE_symm self.bob.1.pos t
+        (self.bob.1.pos_twice_differentiable self.isInertial.out).1.differentiableAt
   have x_deriv : HasDerivAt
       (fun s : ℝ ↦ (self.bob.pos (Time.toRealCLE.symm s)).components 0)
       ((self.bob.vel (Time.toRealCLE.symm t)).components 0) t := by
@@ -2495,7 +2731,7 @@ lemma pendulum_period_eq_nonlinearPendulumPeriod (self : Pendulum)
         {T : ℝ | T > 0 ∧ Function.Periodic
           (positiveAmplitudePosition self.L self.g a_pos a_lt_pi) T} := by
     ext T
-    simp only [Set.mem_setOf_eq, and_congr_right_iff]
+    simp only [Set.mem_ofPred_eq, and_congr_right_iff]
     intro _
     rw [bobPosition_periodic_iff_paramsPosition]
     by_cases theta_initial_pos : 0 < self.params.θ0.toReal
@@ -2605,7 +2841,7 @@ lemma nonlinearPendulumPeriod_tendsto_zero (L g : ℝ+) :
 
 lemma continuousAt_angleToReal_zero :
     ContinuousAt Real.Angle.toReal 0 := by
-  letI : Fact (0 < 2 * Real.pi) := ⟨mul_pos two_pos Real.pi_pos⟩
+  let _ : Fact (0 < 2 * Real.pi) := ⟨mul_pos two_pos Real.pi_pos⟩
   have toReal_eq : Real.Angle.toReal =
       fun theta : Real.Angle ↦ ((AddCircle.equivIoc (2 * Real.pi) (-Real.pi)) theta).1 := by
     funext theta
