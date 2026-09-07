@@ -26,7 +26,7 @@ A particle by itself carries no equation of motion or assumption about which
 forces act on it. It is a constituent from which systems can be assembled, rather
 than a specification of an isolated or unconstrained one-particle system. Newton's
 laws are imposed when particles and forces are assembled in
-`ClassicalMechanics.PointParticle.System`.
+`ClassicalMechanics.PointParticle.NewtonianSystem`.
 
 Position and its first time derivative are required to be differentiable when the
 frame is inertial. This ensures that the velocity and acceleration used in

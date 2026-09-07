@@ -10,7 +10,7 @@ public import Physlib.ClassicalMechanics.PointParticle.Defs
 /-!
 # Newtonian point-particle systems
 
-This module defines `System`, consisting of an inertial reference frame, a finite
+This module defines `NewtonianSystem`, consisting of an inertial reference frame, a finite
 collection of point particles, and the internal and external forces acting on
 them. Particles carry masses and positions over time; forces carry vector values
 over time and identify the particles they act on.
@@ -24,7 +24,7 @@ connect the same pair of particles, the net force on either particle must count
 both spring forces, even though they are equal.
 
 Many classical systems are specified by constraints rather than explicit position
-and force functions. Such models can be formalized as conditions on `System`
+and force functions. Such models can be formalized as conditions on `NewtonianSystem`
 values: which particles and forces are present, geometric constraints such as
 fixed distances, and restrictions on the forces such as centrality.
 
@@ -50,7 +50,7 @@ variable {d : ℕ}
 -/
 
 /-- A finite system of point particles satisfying Newton's laws. -/
-structure System (d : ℕ) where
+structure NewtonianSystem (d : ℕ) where
   /-- The system's reference frame. -/
   frame : ReferenceFrame d
   [isInertial : Fact frame.IsInertial]
@@ -68,9 +68,9 @@ structure System (d : ℕ) where
 
   newton_third_law : internalForces.map .reverse = internalForces
 
-namespace System
+namespace NewtonianSystem
 
-variable (system : System d)
+variable (system : NewtonianSystem d)
 
 instance : Fact system.frame.IsInertial :=
   system.isInertial
@@ -87,7 +87,7 @@ abbrev Particle : Type := system.particles
 
 namespace Particle
 
-variable {system : System d} (particle : system.Particle) (t : Time)
+variable {system : NewtonianSystem d} (particle : system.Particle) (t : Time)
 
 /-- The particle's mass. -/
 def mass : ℝ+ := particle.1.mass
@@ -119,7 +119,7 @@ abbrev Force : Type :=
 
 namespace Force
 
-variable {system : System d} (force : system.Force)
+variable {system : NewtonianSystem d} (force : system.Force)
 
 /-- The underlying force. -/
 @[coe] def inner : system.frame.Force system.Particle :=
@@ -149,7 +149,7 @@ abbrev InternalForce : Type := system.internalForces
 
 namespace InternalForce
 
-variable {system : System d} (force : system.InternalForce)
+variable {system : NewtonianSystem d} (force : system.InternalForce)
 
 /-- View an internal force as a system force. -/
 instance : Coe system.InternalForce system.Force := Coe.mk .inl
@@ -204,4 +204,4 @@ def netExternalForce : system.Vector :=
 def kineticEnergy : ℝ :=
   ∑ particle : system.Particle, particle.kineticEnergy t
 
-end ClassicalMechanics.PointParticle.System
+end ClassicalMechanics.PointParticle.NewtonianSystem
