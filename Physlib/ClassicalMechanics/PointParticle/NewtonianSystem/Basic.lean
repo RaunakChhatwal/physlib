@@ -6,7 +6,7 @@ Authors: Raunak Chhatwal
 module
 
 public import Physlib.ClassicalMechanics.Force
-public import Physlib.ClassicalMechanics.PointParticle.Defs
+public import Physlib.ClassicalMechanics.PointParticle.Basic
 /-!
 # Newtonian point-particle systems
 
@@ -54,18 +54,16 @@ structure NewtonianSystem (d : ℕ) where
   /-- The system's reference frame. -/
   frame : ReferenceFrame d
   [isInertial : Fact frame.IsInertial]
-
   /-- The particles in the system. -/
   particles : Multiset frame.Particle
-
   /-- Forces between particles in the system. -/
   internalForces : Multiset (frame.InternalForce particles)
   /-- Forces on the system from external sources. -/
   externalForces : Multiset (frame.Force particles)
-
+  /-- Newton's second law: the net force on each particle equals its mass times its acceleration. -/
   newton_second_law : ∀ particle : particles,
     netForce particle internalForces externalForces = particle.1.mass • particle.1.acceleration
-
+  /-- Newton's third law: internal forces and their reverses occur with equal multiplicities. -/
   newton_third_law : internalForces.map .reverse = internalForces
 
 namespace NewtonianSystem

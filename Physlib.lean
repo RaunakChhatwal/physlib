@@ -29,7 +29,7 @@ public import Physlib.ClassicalMechanics.Pendulum.SimplePendulum.PeriodFormula
 public import Physlib.ClassicalMechanics.Pendulum.SimplePendulum.SmallAngle
 public import Physlib.ClassicalMechanics.Pendulum.SimplePendulum.Solution
 public import Physlib.ClassicalMechanics.Pendulum.SlidingPendulum
-public import Physlib.ClassicalMechanics.PointParticle.Defs
+public import Physlib.ClassicalMechanics.PointParticle.Basic
 public import Physlib.ClassicalMechanics.PointParticle.NewtonianSystem.Basic
 public import Physlib.ClassicalMechanics.RigidBody.AngularMomentum
 public import Physlib.ClassicalMechanics.RigidBody.AngularVelocity

@@ -71,10 +71,7 @@ def InternalForce.reverse (force : frame.InternalForce Object) : frame.InternalF
   source_ne_target := force.source_ne_target.symm
 
 /-- The net force on `object`. -/
-def netForce
-    (object : Object)
-    (internalForces : Multiset (frame.InternalForce Object))
-    (externalForces : Multiset (frame.Force Object))
-    (t : Time) : frame.Vector :=
+def netForce (object : Object) (internalForces : Multiset (frame.InternalForce Object))
+    (externalForces : Multiset (frame.Force Object)) (t : Time) : frame.Vector :=
   let forces := internalForces.map InternalForce.toForce + externalForces
   ∑ force : forces with force.1.target = object, force.1 t

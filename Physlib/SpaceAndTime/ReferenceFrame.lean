@@ -21,6 +21,13 @@ displacement, but no point is automatically the zero point. The chosen origin th
 the frame, not to space itself. Similarly, a displacement has coordinate components only after a
 basis has been chosen.
 
+Real-valued coordinates in all frames use the same implicit units of space and time. Different
+reference frames represent different coordinate grids, not changes to this shared unit convention.
+`Time` already includes an implicit choice of time unit, origin, and orientation. With this common
+choice, `Time` is also the time coordinate in every frame and should be used directly in place of
+frame-relative time coordinates. A frame therefore carries no additional time origin or time basis.
+This convention applies to vector functions of time and all other time-dependent quantities.
+
 Most applications should use frames that are both inertial and orthonormal. In orthonormal frames,
 the norm and inner product of coordinate vectors are given by the familiar Euclidean formulas. The
 extra generality here also permits nonorthonormal coordinate grids. Giving every coordinate tuple
@@ -44,7 +51,6 @@ A reference frame can be pictured as a coordinate grid carried through time. It 
 motion is described, not an additional physical object moving with the particles.
 -/
 
-TODO "Add `timeOrigin` to enable time translations."
 /-- A time-indexed choice of affine origin and displacement basis in `d`-dimensional space. -/
 structure ReferenceFrame (d : ℕ) where
   /-- The point assigned coordinate zero at each time. -/
@@ -149,6 +155,10 @@ def componentEquiv : frame.Vector ≃ (Fin d → ℝ) :=
 instance : AddCommGroup frame.Vector := componentEquiv.addCommGroup
 
 instance : Module ℝ frame.Vector := componentEquiv.module ℝ
+
+/-- Scalar multiplication by a positive real. -/
+instance : SMul {x : ℝ // 0 < x} frame.Vector where
+  smul c x := c.val • x
 
 /-- Linear equivalence between frame vectors and coordinate components. -/
 def componentLinearEquiv : frame.Vector ≃ₗ[ℝ] (Fin d → ℝ) :=

@@ -45,16 +45,6 @@ variable {d : ℕ} {frame : ReferenceFrame d}
 /-- Positive real numbers. -/
 notation "ℝ+" => {x : ℝ // 0 < x}
 
-/-- Scalar multiplication by a positive real. -/
-instance : SMul ℝ+ frame.Vector where
-  smul c x := c.val • x
-
-/-!
-## A. Point particles
-
-A point particle has a positive mass and a trajectory relative to a reference frame.
--/
-
 /-- A point particle in `frame`. -/
 structure Particle (frame : ReferenceFrame d) where
   /-- The particle's mass. -/
