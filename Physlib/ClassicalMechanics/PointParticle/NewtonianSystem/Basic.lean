@@ -85,7 +85,7 @@ abbrev Particle : Type := system.particles
 
 namespace Particle
 
-variable {system : NewtonianSystem d} (particle : system.Particle) (t : Time)
+variable {system : NewtonianSystem d} (particle : system.Particle) (t : ℝ)
 
 /-- The particle's mass. -/
 def mass : ℝ+ := particle.1.mass
@@ -126,9 +126,9 @@ variable {system : NewtonianSystem d} (force : system.Force)
 instance : Coe system.Force (system.frame.Force system.Particle) := Coe.mk inner
 
 /-- The force at `t`. -/
-def value (t : Time) : system.Vector := force.inner.value t
+def value (t : ℝ) : system.Vector := force.inner.value t
 
-instance : CoeFun system.Force (fun _ => Time → system.Vector) where
+instance : CoeFun system.Force (fun _ => ℝ → system.Vector) where
   coe := value
 
 /-- The force's target. -/
@@ -153,7 +153,7 @@ variable {system : NewtonianSystem d} (force : system.InternalForce)
 instance : Coe system.InternalForce system.Force := Coe.mk .inl
 
 /-- The force at `t`. -/
-def value (t : Time) : system.Vector := force.1.value t
+def value (t : ℝ) : system.Vector := force.1.value t
 
 /-- The force's target. -/
 def target : system.Particle := force.1.target
@@ -184,7 +184,7 @@ end InternalForce
 ## D. Aggregate quantities
 -/
 
-variable (t : Time)
+variable (t : ℝ)
 
 /-- Total mass. -/
 def mass : ℝ :=

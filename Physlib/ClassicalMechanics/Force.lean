@@ -44,11 +44,11 @@ variable {d : ℕ} {frame : ReferenceFrame d} {Object : Type}
 /-- A time-dependent force acting on an object. -/
 structure Force (frame : ReferenceFrame d) (Object : Type) where
   /-- The force vector. -/
-  value : Time → frame.Vector
+  value : ℝ → frame.Vector
   /-- The target object. -/
   target : Object
 
-instance : CoeFun (frame.Force Object) (fun _ => Time → frame.Vector) where
+instance : CoeFun (frame.Force Object) (fun _ => ℝ → frame.Vector) where
   coe := Force.value
 
 /-- A force between two objects. -/
@@ -57,7 +57,7 @@ structure InternalForce (frame : ReferenceFrame d) (Object : Type) extends frame
   source : Object
   source_ne_target : source ≠ target
 
-instance : CoeFun (frame.InternalForce Object) (fun _ => Time → frame.Vector) where
+instance : CoeFun (frame.InternalForce Object) (fun _ => ℝ → frame.Vector) where
   coe force := force.value
 
 instance : Coe (frame.InternalForce Object) (frame.Force Object) where
@@ -72,6 +72,6 @@ def InternalForce.reverse (force : frame.InternalForce Object) : frame.InternalF
 
 /-- The net force on `object`. -/
 def netForce (object : Object) (internalForces : Multiset (frame.InternalForce Object))
-    (externalForces : Multiset (frame.Force Object)) (t : Time) : frame.Vector :=
+    (externalForces : Multiset (frame.Force Object)) (t : ℝ) : frame.Vector :=
   let forces := internalForces.map InternalForce.toForce + externalForces
   ∑ force : forces with force.1.target = object, force.1 t

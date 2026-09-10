@@ -8,8 +8,9 @@ Overview: |
     displacement, and a displacement acquires numerical components only once
     axes have been picked. Space carries a zero point of its own, but an
     observer is under no obligation to use it: which point the coordinates call
-    zero is part of the observer's choice. A reference frame is that pair of
-    choices, an origin and a set of axes, carried along through time.
+    zero is part of the observer's choice. Likewise, no instant of time is
+    canonically zero. A reference frame is that collection of choices: a time
+    origin, and an origin and a set of axes carried along through time.
 
     An inertial frame is one whose grid is not being pushed around. Its axes are
     the same at every time, and its origin drifts in a straight line at constant
@@ -39,9 +40,9 @@ References: []
 
 Requirements:
 
-  - description: "The key data structure `ReferenceFrame d`, recording an affine origin and a displacement basis at each time, is defined."
+  - description: "The key data structure `ReferenceFrame d`, recording a time origin together with an affine origin and a displacement basis at each time, is defined."
     done: true
-    location: "Physlib/SpaceAndTime/ReferenceFrame.lean (ReferenceFrame, ReferenceFrame.origin, ReferenceFrame.basis)"
+    location: "Physlib/SpaceAndTime/ReferenceFrame.lean (ReferenceFrame, ReferenceFrame.timeOrigin, ReferenceFrame.origin, ReferenceFrame.basis)"
 
   - description: "The API contains a construction of a frame from the trajectories of a collection of reference points forming an affine basis at each time."
     done: true
@@ -92,8 +93,8 @@ Requirements:
     location: "Physlib/SpaceAndTime/ReferenceFrame.lean (norm_euclidean_if_orthonormal, inner_euclidean_if_orthonormal)"
 
   - description: "The API shall contain a choice of time origin for a frame, so that time translations can act on frames."
-    done: false
-    location: N/A
+    done: true
+    location: "Physlib/SpaceAndTime/ReferenceFrame.lean (ReferenceFrame.timeOrigin, ReferenceFrame.timeEquiv)"
 
   - description: "The API shall contain the defining property of an inertial frame's origin velocity, and the origin and basis of a frame built from reference points."
     done: false

@@ -8,7 +8,7 @@ module
 public import Mathlib.LinearAlgebra.AffineSpace.Basis
 public import Mathlib.Topology.Algebra.Module.TransferInstance
 public import Physlib.SpaceAndTime.Space.Basic
-public import Physlib.SpaceAndTime.Time.Scalar
+public import Physlib.SpaceAndTime.Time.Basic
 /-!
 # Reference frames
 
@@ -19,14 +19,8 @@ point requires an origin and a basis for measuring displacements from that origi
 This distinction is built into `Space d`, which is an affine space. Two points determine a
 displacement, but no point is automatically the zero point. The chosen origin therefore belongs to
 the frame, not to space itself. Similarly, a displacement has coordinate components only after a
-basis has been chosen.
-
-Real-valued coordinates in all frames use the same implicit units of space and time. Different
-reference frames represent different coordinate grids, not changes to this shared unit convention.
-`Time` already includes an implicit choice of time unit, origin, and orientation. With this common
-choice, `Time` is also the time coordinate in every frame and should be used directly in place of
-frame-relative time coordinates. A frame therefore carries no additional time origin or time basis.
-This convention applies to vector functions of time and all other time-dependent quantities.
+basis has been chosen. Real-valued coordinates in all frames use the same implicit units of space
+and time. Different frames represent different coordinate grids, not different units.
 
 Most applications should use frames that are both inertial and orthonormal. In orthonormal frames,
 the norm and inner product of coordinate vectors are given by the familiar Euclidean formulas. The
@@ -51,8 +45,10 @@ A reference frame can be pictured as a coordinate grid carried through time. It 
 motion is described, not an additional physical object moving with the particles.
 -/
 
-/-- A time-indexed choice of affine origin and displacement basis in `d`-dimensional space. -/
+/-- A time origin and a time-indexed spatial origin and basis in `d`-dimensional space. -/
 structure ReferenceFrame (d : ℕ) where
+  /-- The instant assigned time coordinate zero. -/
+  timeOrigin : Time
   /-- The point assigned coordinate zero at each time. -/
   origin : Time → Space d
   /-- The basis used to turn displacement vectors into coordinate components at each time. -/
@@ -65,22 +61,31 @@ span the whole space. One reference point is chosen as the origin, and the displ
 the remaining points form the coordinate basis. The resulting frame need not be inertial or
 orthonormal. -/
 def ReferenceFrame.fromReferencePoints
+    (timeOrigin : Time)
     (referencePoints : Finset (Time → Space d))
     (independence : ∀ t, AffineIndependent ℝ fun point : referencePoints => point.val t)
     (spans_space : ∀ t, affineSpan ℝ {point.val t | point : referencePoints} = ⊤) :
     ReferenceFrame d :=
   let affineBasis (t : Time) : AffineBasis referencePoints ℝ (Space d) :=
     ⟨fun point => point.val t, independence t, spans_space t⟩
-  let reference_points_not_empty := (affineBasis 0).nonempty
+  let reference_points_not_empty := (affineBasis timeOrigin).nonempty
   let origin := Classical.choice reference_points_not_empty
   letI := Fintype.ofFinite {point : referencePoints // point ≠ origin}
   let basis t := (affineBasis t).basisOf origin
   let other_reference_points_size_eq_dim :
       Fintype.card {point : referencePoints // point ≠ origin} = d :=
-    by simpa using (Module.finrank_eq_card_basis <| basis 0).symm
+    by simpa using (Module.finrank_eq_card_basis <| basis timeOrigin).symm
   let basisReindexed t :=
     (basis t).reindex (Fintype.equivFinOfCardEq other_reference_points_size_eq_dim)
-  { origin := origin, basis := basisReindexed }
+  { timeOrigin := timeOrigin, origin := origin, basis := basisReindexed }
+
+namespace ReferenceFrame
+
+variable {frame : ReferenceFrame d}
+
+/-- Convert a frame's real-valued time coordinate into an instant in affine time. -/
+def timeEquiv (frame : ReferenceFrame d) : ℝ ≃ᵃ[ℝ] Time :=
+  AffineEquiv.vaddConst ℝ frame.timeOrigin
 
 /-!
 ## B. Inertial reference frames
@@ -89,10 +94,6 @@ In Newtonian mechanics, an inertial coordinate grid does not rotate or change sc
 moves in a straight line at constant velocity. These conditions restrict the frame, not the
 particles described in that frame.
 -/
-
-namespace ReferenceFrame
-
-variable {frame : ReferenceFrame d}
 
 /-- Whether the frame basis induces the same inner product on coordinates at every time. -/
 def IsMetricConserved (frame : ReferenceFrame d) : Prop :=
@@ -114,7 +115,7 @@ instance [h : Fact frame.Orthonormal] : Fact frame.IsMetricConserved := ⟨h.out
 structure IsInertial (frame : ReferenceFrame d) : Prop where
   /-- Elapsed time times `velocity` is exactly the origin's displacement. -/
   origin_moves_uniformly :
-    ∃ velocity, ∀ t₁ t₂, frame.origin t₂ -ᵥ frame.origin t₁ = (t₂ - t₁).val • velocity
+    ∃ velocity, ∀ t₁ t₂, frame.origin t₂ -ᵥ frame.origin t₁ = (t₂ -ᵥ t₁) • velocity
   /-- The coordinate axes neither rotate nor change scale with time. -/
   basis_conserved : ∀ t₁ t₂, frame.basis t₁ = frame.basis t₂
 
@@ -165,9 +166,9 @@ def componentLinearEquiv : frame.Vector ≃ₗ[ℝ] (Fin d → ℝ) :=
   {componentEquiv with map_add' _ _ := rfl, map_smul' _ _ := rfl}
 
 /-- Equivalence between frame vectors and geometric displacements in space,
-defined by the frame's basis at `t`. -/
-def dispEquiv (t : Time) : frame.Vector ≃ₗ[ℝ] EuclideanSpace ℝ (Fin d) :=
-  componentLinearEquiv.trans (frame.basis t).equivFun.symm
+defined by the frame's basis at time coordinate `t`. -/
+def dispEquiv (t : ℝ) : frame.Vector ≃ₗ[ℝ] EuclideanSpace ℝ (Fin d) :=
+  componentLinearEquiv.trans (frame.basis (frame.timeEquiv t)).equivFun.symm
 
 /-- Use the same topology for frame vectors as components' product topology. -/
 instance : TopologicalSpace frame.Vector := componentEquiv.topologicalSpace
@@ -182,9 +183,10 @@ instance : FiniteDimensional ℝ frame.Vector :=
   FiniteDimensional.of_injective componentLinearEquiv.toLinearMap componentEquiv.injective
 
 /-- Continuous equivalence between frame vectors and geometric displacements in space,
-defined by the frame's basis at `t`. -/
-def contDispEquiv (t : Time) : frame.Vector ≃L[ℝ] EuclideanSpace ℝ (Fin d) :=
-  (componentContLinearEquiv frame).trans (frame.basis t).equivFun.toContinuousLinearEquiv.symm
+defined by the frame's basis at time coordinate `t`. -/
+def contDispEquiv (t : ℝ) : frame.Vector ≃L[ℝ] EuclideanSpace ℝ (Fin d) :=
+  (componentContLinearEquiv frame).trans
+    (frame.basis (frame.timeEquiv t)).equivFun.toContinuousLinearEquiv.symm
 
 /-- The physical norm on frame vectors, pulled back from geometric displacement space. -/
 instance [_h : Fact frame.IsMetricConserved] : NormedAddCommGroup frame.Vector :=
@@ -207,7 +209,7 @@ instance [Fact frame.IsMetricConserved] : InnerProductSpace ℝ frame.Vector whe
 lemma norm_euclidean_if_orthonormal [h : Fact frame.Orthonormal] :
     ∀ v : frame.Vector, ‖v‖^2 = ∑ i, (v.components i)^2 := by
   intro v
-  let basis := (frame.basis 0).toOrthonormalBasis (h.out 0)
+  let basis := (frame.basis (frame.timeEquiv 0)).toOrthonormalBasis (h.out _)
   calc
     _ = ‖basis.repr.symm (WithLp.toLp 2 v.components)‖ ^ 2 := by rfl
     _ = ‖WithLp.toLp 2 v.components‖ ^ 2 := by rw [basis.repr.symm.norm_map]
@@ -217,7 +219,7 @@ lemma norm_euclidean_if_orthonormal [h : Fact frame.Orthonormal] :
 lemma inner_euclidean_if_orthonormal [h : Fact frame.Orthonormal] :
     ∀ v w : frame.Vector, inner ℝ v w = ∑ i, v.components i * w.components i := by
   intro v w
-  let basis := (frame.basis 0).toOrthonormalBasis (h.out 0)
+  let basis := (frame.basis (frame.timeEquiv 0)).toOrthonormalBasis (h.out _)
   calc
     _ = inner ℝ (basis.repr.symm <| WithLp.toLp 2 v.components)
         (basis.repr.symm <| WithLp.toLp 2 w.components) := by rfl
