@@ -8,7 +8,7 @@ module
 public import Physlib.Relativity.SpeedOfLight
 public import Physlib.Relativity.Tensors.RealTensor.Vector.Tensorial
 public import Physlib.SpaceAndTime.Space.Integrals.Basic
-public import Physlib.SpaceAndTime.Time.Scalar
+public import Physlib.SpaceAndTime.Time.InnerProductSpace
 public import Physlib.Meta.Informal.Basic
 /-!
 # Spacetime

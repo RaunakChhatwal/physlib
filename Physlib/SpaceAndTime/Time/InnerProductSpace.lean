@@ -9,12 +9,12 @@ public import Mathlib.Analysis.Calculus.FDeriv.Linear
 public import Mathlib.MeasureTheory.Measure.Haar.InnerProductSpace
 public import Physlib.SpaceAndTime.Time.Basic
 /-!
-# Scalar structure on time
+# Time as an inner product space
 
 ## i. Overview
 
-In this module we equip the affine type `Time` with scalar structure, choosing the
-implicit origin represented by `Time.mk 0`. The units and orientation agree with the
+In this module we equip the affine type `Time` with a real inner product space structure,
+choosing the implicit origin represented by `Time.mk 0`. The units and orientation agree with the
 real-valued displacements defined in `Physlib.SpaceAndTime.Time.Basic`.
 
 We note that this is the version of time most often used in undergraduate and
@@ -38,7 +38,7 @@ or origin.
 
 ## ii. Key results
 
-- `toRealCLE` : The continuous linear equivalence with real-valued scalar time.
+- `toRealCLE` : The continuous linear equivalence from `Time` to `ℝ`.
 
 ## iii. Table of contents
 

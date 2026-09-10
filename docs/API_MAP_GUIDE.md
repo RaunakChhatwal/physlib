@@ -68,7 +68,7 @@ linter) find the exact declarations that realize the requirement. The grammar
 is: one or more file groups, each a file path followed by a parenthesized,
 comma-separated list of names.
 
-    Physlib/SpaceAndTime/Time/Scalar.lean (AddCommGroup Time, toRealCLM)
+    Physlib/SpaceAndTime/Time/InnerProductSpace.lean (AddCommGroup Time, toRealCLM)
 
 Rules:
 

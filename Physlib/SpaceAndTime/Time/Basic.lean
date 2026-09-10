@@ -16,7 +16,7 @@ such a duration to an instant produces another instant. There is no distinguishe
 
 The field `Time.val` is an implementation coordinate, not a frame-relative time
 coordinate. A reference frame chooses its own time origin. Import
-`Physlib.SpaceAndTime.Time.Scalar` to use the additional scalar structure with the
+`Physlib.SpaceAndTime.Time.InnerProductSpace` to use the inner product space structure with the
 implicit origin `Time.mk 0`, including addition of instants, norms, and derivatives.
 -/
 

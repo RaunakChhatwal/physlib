@@ -7,7 +7,7 @@ Overview: |
     representing instants of time with a given (but arbitrary) choice of units and
     orientation. It is an affine space over `ℝ`: two instants determine a real elapsed
     time, and no instant is canonically zero. Choosing the implicit origin `Time.mk 0`
-    gives the scalar version of time most often used in non-relativistic physics,
+    gives the version of time most often used in non-relativistic physics,
     forming a 1d real inner-product space. The API also contains the time
     derivative `∂ₜ` of functions on `Time`, and the related types `TimeMan`,
     `TimeTransMan` and `TimeUnit`, versions of time with fewer choices made,
@@ -31,19 +31,19 @@ Requirements:
 
   - description: "The API contains an instance of a vector space (module) on `Time`, given the implicit origin `Time.mk 0`, with an orthonormal basis and continuous linear/isometric equivalences to `ℝ`."
     done: true
-    location: "Physlib/SpaceAndTime/Time/Scalar.lean (AddCommGroup Time, Module ℝ Time, basis : OrthonormalBasis (Fin 1) ℝ Time, toRealCLM, toRealCLE, toRealLIE)"
+    location: "Physlib/SpaceAndTime/Time/InnerProductSpace.lean (AddCommGroup Time, Module ℝ Time, basis : OrthonormalBasis (Fin 1) ℝ Time, toRealCLM, toRealCLE, toRealLIE)"
 
   - description: "The API contains an ordering on `Time`."
     done: true
-    location: "Physlib/SpaceAndTime/Time/Scalar.lean (LE Time, PartialOrder Time)"
+    location: "Physlib/SpaceAndTime/Time/InnerProductSpace.lean (LE Time, PartialOrder Time)"
 
   - description: "The API contains a norm on `Time`, and an inner product making it a 1d real inner-product space."
     done: true
-    location: "Physlib/SpaceAndTime/Time/Scalar.lean (Norm Time, NormedAddCommGroup Time, NormedSpace ℝ Time, InnerProductSpace ℝ Time)"
+    location: "Physlib/SpaceAndTime/Time/InnerProductSpace.lean (Norm Time, NormedAddCommGroup Time, NormedSpace ℝ Time, InnerProductSpace ℝ Time)"
 
   - description: "The API contains a measure-theoretic structure on `Time` (a Borel measurable space, with the volume measure equal to the Haar measure associated with the basis)."
     done: true
-    location: "Physlib/SpaceAndTime/Time/Scalar.lean (MeasurableSpace Time, BorelSpace Time, volume_eq_basis_addHaar, val_measurePreserving)"
+    location: "Physlib/SpaceAndTime/Time/InnerProductSpace.lean (MeasurableSpace Time, BorelSpace Time, volume_eq_basis_addHaar, val_measurePreserving)"
 
   - description: "The API contains the derivatives of functions from `Time` to normed spaces, with linearity, constant-function, quotient and smoothness lemmas, and compatibility with Euclidean and Lorentz-vector components."
     done: true

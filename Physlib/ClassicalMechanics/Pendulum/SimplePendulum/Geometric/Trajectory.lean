@@ -6,7 +6,7 @@ Authors: Aadarsh Agarwal
 module
 
 public import Physlib.ClassicalMechanics.Pendulum.SimplePendulum.Geometric.Basic
-public import Physlib.SpaceAndTime.Time.Scalar
+public import Physlib.SpaceAndTime.Time.InnerProductSpace
 public import Mathlib.Geometry.Manifold.ContMDiff.NormedSpace
 /-!
 

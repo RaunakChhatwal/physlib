@@ -7,7 +7,7 @@ module
 
 public import Mathlib.Geometry.Manifold.Diffeomorph
 public import Physlib.Meta.TODO.Basic
-public import Physlib.SpaceAndTime.Time.Scalar
+public import Physlib.SpaceAndTime.Time.InnerProductSpace
 public import Physlib.SpaceAndTime.Time.TimeUnit
 /-!
 
