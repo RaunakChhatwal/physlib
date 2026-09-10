@@ -6,7 +6,7 @@ Authors: Joseph Tooby-Smith
 module
 
 public import Mathlib.Geometry.Manifold.Diffeomorph
-public import Physlib.SpaceAndTime.Time.Basic
+public import Physlib.SpaceAndTime.Time.Scalar
 public import Physlib.SpaceAndTime.Time.TimeUnit
 /-!
 

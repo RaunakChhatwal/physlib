@@ -8,7 +8,7 @@ module
 public import Mathlib.LinearAlgebra.AffineSpace.Basis
 public import Mathlib.Topology.Algebra.Module.TransferInstance
 public import Physlib.SpaceAndTime.Space.Basic
-public import Physlib.SpaceAndTime.Time.Basic
+public import Physlib.SpaceAndTime.Time.Scalar
 /-!
 # Reference frames
 

@@ -7,7 +7,7 @@ module
 
 public import Physlib.SpaceAndTime.Space.EuclideanGroup.Basic
 public import Physlib.SpaceAndTime.Space.Origin
-public import Physlib.SpaceAndTime.Time.Basic
+public import Physlib.SpaceAndTime.Time.Scalar
 
 /-!
 # The Galilean group

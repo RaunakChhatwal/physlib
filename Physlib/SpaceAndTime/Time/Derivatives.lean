@@ -7,7 +7,7 @@ module
 
 public import Physlib.Relativity.Tensors.RealTensor.Vector.Basic
 public import Physlib.SpaceAndTime.Space.Module
-public import Physlib.SpaceAndTime.Time.Basic
+public import Physlib.SpaceAndTime.Time.Scalar
 public import Mathlib.Analysis.Calculus.Deriv.Inv
 public import Mathlib.Analysis.InnerProductSpace.Calculus
 /-!
