@@ -6,6 +6,7 @@ Authors: Joseph Tooby-Smith
 module
 
 public import Mathlib.Geometry.Manifold.Diffeomorph
+public import Physlib.Meta.TODO.Basic
 public import Physlib.SpaceAndTime.Time.Scalar
 public import Physlib.SpaceAndTime.Time.TimeUnit
 /-!
@@ -46,6 +47,8 @@ This map is a diffeomorphism (to be shown).
 -/
 
 @[expose] public section
+
+TODO "Remove `TimeTransMan` in favor of affine `Time`."
 
 /-- The type `TimeTransMan` represents the time manifold with an orientation and
   a transitive action of the reals. -/

@@ -8,7 +8,7 @@ module
 public import Mathlib.Data.Real.Basic
 public import Mathlib.LinearAlgebra.AffineSpace.Defs
 /-!
-# Affine time
+# Time
 
 `Time` represents instants with a fixed but arbitrary unit and orientation. It is an
 affine space over `ℝ`: two instants determine a real-valued elapsed time, and adding
