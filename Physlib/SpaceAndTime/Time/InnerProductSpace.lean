@@ -32,10 +32,6 @@ the angular frequency `ω` are consistent.
 
 With this choice, `Time` becomes a 1d vector space over `ℝ` with an inner product.
 
-Within other modules e.g. `TimeMan` and `TimeTransMan`, we define
-versions of time with less choices made, and relate them to `Time` via a choice of units
-or origin.
-
 ## ii. Key results
 
 - `toRealCLE` : The continuous linear equivalence from `Time` to `ℝ`.
@@ -254,9 +250,6 @@ instance : Norm Time where
 lemma norm_eq_val (t : Time) :
     ‖t‖ = ‖t.val‖ := rfl
 
-instance : Dist Time where
-  dist t1 t2 := ‖t1 - t2‖
-
 lemma dist_eq_val (t1 t2 : Time) :
     dist t1 t2 = ‖t1.val - t2.val‖ := rfl
 
@@ -264,21 +257,12 @@ lemma dist_eq_real_dist (t1 t2 : Time) :
     dist t1 t2 = dist t1.val t2.val := by rfl
 
 instance : SeminormedAddCommGroup Time where
-  dist_self t := by simp [dist_eq_real_dist]
-  dist_comm t1 t2 := by simp [dist_eq_real_dist, dist_comm]
-  dist_triangle := by simp [dist_eq_real_dist, dist_triangle]
   dist_eq t1 t2 := by
     simp [dist_eq_val, norm_eq_val]
     rw [abs_eq_iff_mul_self_eq]
     ring
 
 instance : NormedAddCommGroup Time where
-  eq_of_dist_eq_zero := by
-    intro a b h
-    simp [dist, norm] at h
-    ext
-    rw [sub_eq_zero] at h
-    exact h
   dist_eq t1 t2 := by
     simp [dist_eq_val, norm_eq_val]
     rw [abs_eq_iff_mul_self_eq]

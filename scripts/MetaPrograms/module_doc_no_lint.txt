@@ -287,7 +287,6 @@ Physlib/SpaceAndTime/Space/LengthUnit.lean
 Physlib/SpaceAndTime/Space/Translations.lean
 Physlib/SpaceAndTime/SpaceTime/TimeSlice.lean
 Physlib/SpaceAndTime/Time/TimeMan.lean
-Physlib/SpaceAndTime/Time/TimeTransMan.lean
 Physlib/SpaceAndTime/Time/TimeUnit.lean
 Physlib/StatisticalMechanics/BoltzmannConstant.lean
 Physlib/StatisticalMechanics/CanonicalEnsemble/Basic.lean
