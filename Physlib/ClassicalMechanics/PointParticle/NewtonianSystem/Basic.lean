@@ -43,8 +43,6 @@ namespace ClassicalMechanics.PointParticle
 
 open ReferenceFrame
 
-variable {d : ℕ}
-
 /-!
 ## A. Systems
 -/
@@ -53,7 +51,7 @@ variable {d : ℕ}
 structure NewtonianSystem (d : ℕ) where
   /-- The system's reference frame. -/
   frame : ReferenceFrame d
-  [isInertial : Fact frame.IsInertial]
+  frame_inertial : frame.IsInertial
   /-- The particles in the system. -/
   particles : Multiset frame.Particle
   /-- Forces between particles in the system. -/
@@ -68,10 +66,7 @@ structure NewtonianSystem (d : ℕ) where
 
 namespace NewtonianSystem
 
-variable (system : NewtonianSystem d)
-
-instance : Fact system.frame.IsInertial :=
-  system.isInertial
+variable {d : ℕ} (system : NewtonianSystem d)
 
 /-!
 ## B. System particles
@@ -155,6 +150,8 @@ instance : Coe system.InternalForce system.Force := Coe.mk .inl
 /-- The force at `t`. -/
 def value (t : ℝ) : system.Vector := force.1.value t
 
+instance : CoeFun system.InternalForce (fun _ => ℝ → system.Vector) := .mk value
+
 /-- The force's target. -/
 def target : system.Particle := force.1.target
 
@@ -165,9 +162,7 @@ def source : system.Particle := force.1.source
 lemma reverse_count_eq :
     system.internalForces.count force.1.reverse = system.internalForces.count force.1 := by
   rw [← congrArg (Multiset.count force.1.reverse) system.newton_third_law]
-  refine Multiset.count_map_eq_count' _ _ (Function.Involutive.injective ?_) _
-  intro internalForce
-  rcases internalForce with ⟨⟨value, target⟩, source, source_ne_target⟩
+  refine Multiset.count_map_eq_count' _ _ (Function.Involutive.injective fun _ ↦ ?_) _
   simp [ReferenceFrame.InternalForce.reverse]
 
 /-- The reverse force. -/
@@ -176,7 +171,7 @@ def reverse : system.InternalForce :=
 
 /-- Whether the force lies along the line joining its source and target. -/
 def Central : Prop :=
-  ∀ t, ∃ c : ℝ, force.value t = c • (force.target.pos t - force.source.pos t)
+  ∀ t, ∃ c : ℝ, force t = c • (force.target.pos t - force.source.pos t)
 
 end InternalForce
 
